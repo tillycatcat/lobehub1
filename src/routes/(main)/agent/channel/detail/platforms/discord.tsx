@@ -12,6 +12,7 @@ export const getDiscordFormItems = (
 ): FormItemProps[] => [
   {
     children: <FormInput placeholder={t('channel.applicationIdPlaceholder')} />,
+    desc: t('channel.applicationIdHint'),
     label: t('channel.applicationId'),
     name: 'applicationId',
     rules: [{ required: true }],
@@ -34,6 +35,7 @@ export const getDiscordFormItems = (
   },
   {
     children: <FormInput placeholder={t('channel.publicKeyPlaceholder')} />,
+    desc: t('channel.publicKeyHint'),
     label: t('channel.publicKey'),
     name: 'publicKey',
     tag: provider.fieldTags.publicKey,

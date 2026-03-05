@@ -1,5 +1,6 @@
 export default {
   'channel.applicationId': 'Application ID / Bot Username',
+  'channel.applicationIdHint': 'Unique identifier for your bot application.',
   'channel.applicationIdPlaceholder': 'e.g. 1234567890',
   'channel.appSecret': 'App Secret',
   'channel.appSecretPlaceholder': 'Paste your app secret here',
@@ -14,7 +15,7 @@ export default {
   'channel.deleteConfirm': 'Are you sure you want to remove this integration?',
   'channel.devWebhookProxyUrl': 'HTTPS Tunnel URL',
   'channel.devWebhookProxyUrlHint':
-    'Telegram requires HTTPS for webhooks. Paste your tunnel URL (e.g. from cloudflared or ngrok) to forward webhook requests to your local dev server.',
+    'HTTPS tunnel URL for forwarding webhook requests to local dev server.',
   'channel.disabled': 'Disabled',
   'channel.discord.description':
     'Connect this assistant to Discord server for channel chat and direct messages.',
@@ -30,6 +31,7 @@ export default {
   'channel.lark.description': 'Connect this assistant to Lark for private and group chats.',
   'channel.platforms': 'Platforms',
   'channel.publicKey': 'Public Key',
+  'channel.publicKeyHint': 'Used to verify interaction requests from Discord.',
   'channel.publicKeyPlaceholder': 'Required for interaction verification',
   'channel.removeIntegration': 'Remove Integration',
   'channel.removed': 'Integration removed',

@@ -12,6 +12,7 @@ export const getFeishuFormItems = (
 ): FormItemProps[] => [
   {
     children: <FormInput placeholder={t('channel.applicationIdPlaceholder')} />,
+    desc: t('channel.applicationIdHint'),
     label: t('channel.applicationId'),
     name: 'applicationId',
     rules: [{ required: true }],
