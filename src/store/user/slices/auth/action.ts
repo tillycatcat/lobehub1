@@ -22,8 +22,12 @@ const fetchAuthProvidersData = async (): Promise<AuthProvidersData> => {
         const info = await accountInfo({
           query: { accountId: account.accountId },
         });
+        const claims = (info.data?.data as Record<string, unknown>) ?? undefined;
         return {
+          claims,
           email: info.data?.user?.email ?? undefined,
+          image: info.data?.user?.image ?? undefined,
+          name: info.data?.user?.name ?? undefined,
           provider: account.providerId,
           providerAccountId: account.accountId,
         };

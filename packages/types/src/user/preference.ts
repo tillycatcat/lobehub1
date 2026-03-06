@@ -108,9 +108,15 @@ export const OAuthAccountSchema = z.object({
  * SSO Provider info displayed in profile page
  */
 export interface SSOProvider {
+  /** Raw OIDC claims from the provider's userInfo endpoint */
+  claims?: Record<string, unknown>;
   email?: string;
   /** Expiration time - Date for better-auth */
   expiresAt?: Date | number | null;
+  /** Profile image URL from the provider */
+  image?: string;
+  /** Display name from the provider */
+  name?: string;
   provider: string;
   providerAccountId: string;
 }
