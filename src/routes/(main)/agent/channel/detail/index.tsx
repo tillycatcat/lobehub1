@@ -18,6 +18,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     display: flex;
     flex: 1;
     flex-direction: column;
+    align-items: center;
 
     background: ${cssVar.colorBgContainer};
   `,
