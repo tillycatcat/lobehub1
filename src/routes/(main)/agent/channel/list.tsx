@@ -6,7 +6,7 @@ import { Info } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { IntegrationProvider } from './const';
+import type { ChannelProvider } from './const';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
   root: css`
@@ -78,7 +78,7 @@ interface PlatformListProps {
   activeId: string;
   connectedPlatforms: Set<string>;
   onSelect: (id: string) => void;
-  providers: IntegrationProvider[];
+  providers: ChannelProvider[];
 }
 
 const PlatformList = memo<PlatformListProps>(

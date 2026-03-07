@@ -3,12 +3,12 @@ import type { TFunction } from 'i18next';
 
 import { FormInput, FormPassword } from '@/components/FormInput';
 
-import type { IntegrationProvider } from '../../const';
+import type { ChannelProvider } from '../../const';
 
 export const getTelegramFormItems = (
   t: TFunction,
   hasConfig: boolean,
-  provider: IntegrationProvider,
+  provider: ChannelProvider,
 ): FormItemProps[] => [
   {
     children: (

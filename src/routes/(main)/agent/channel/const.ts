@@ -4,7 +4,7 @@ import type { FC } from 'react';
 
 import { LarkIcon } from './icons';
 
-export interface IntegrationProvider {
+export interface ChannelProvider {
   /** Lark-style auth: appId + appSecret instead of botToken */
   authMode?: 'app-secret' | 'bot-token';
   /** Whether applicationId can be auto-derived from the bot token */
@@ -30,7 +30,7 @@ export interface IntegrationProvider {
   webhookMode?: 'auto' | 'manual';
 }
 
-export const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
+export const CHANNEL_PROVIDERS: ChannelProvider[] = [
   {
     color: '#5865F2',
     description: 'channel.discord.description',

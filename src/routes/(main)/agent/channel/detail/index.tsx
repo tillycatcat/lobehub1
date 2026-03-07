@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useAgentStore } from '@/store/agent';
 
-import { type IntegrationProvider } from '../const';
+import { type ChannelProvider } from '../const';
 import Body from './Body';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -32,7 +32,7 @@ interface CurrentConfig {
   platform: string;
 }
 
-export interface IntegrationFormValues {
+export interface ChannelFormValues {
   applicationId: string;
   appSecret?: string;
   botToken: string;
@@ -51,13 +51,13 @@ export interface TestResult {
 interface PlatformDetailProps {
   agentId: string;
   currentConfig?: CurrentConfig;
-  provider: IntegrationProvider;
+  provider: ChannelProvider;
 }
 
 const PlatformDetail = memo<PlatformDetailProps>(({ provider, agentId, currentConfig }) => {
   const { t } = useTranslation('agent');
   const { message: msg, modal } = App.useApp();
-  const [form] = Form.useForm<IntegrationFormValues>();
+  const [form] = Form.useForm<ChannelFormValues>();
 
   const [createBotProvider, deleteBotProvider, updateBotProvider, connectBot] = useAgentStore(
     (s) => [s.createBotProvider, s.deleteBotProvider, s.updateBotProvider, s.connectBot],

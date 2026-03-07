@@ -17,8 +17,8 @@ import { Trans, useTranslation } from 'react-i18next';
 
 import { useAppOrigin } from '@/hooks/useAppOrigin';
 
-import { type IntegrationProvider } from '../const';
-import type { IntegrationFormValues, TestResult } from './index';
+import { type ChannelProvider } from '../const';
+import type { ChannelFormValues, TestResult } from './index';
 import { getDiscordFormItems } from './platforms/discord';
 import { getFeishuFormItems } from './platforms/feishu';
 import { getLarkFormItems } from './platforms/lark';
@@ -72,7 +72,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
 const platformFormItemsMap: Record<
   string,
-  (t: any, hasConfig: boolean, provider: IntegrationProvider) => FormItemProps[]
+  (t: any, hasConfig: boolean, provider: ChannelProvider) => FormItemProps[]
 > = {
   discord: getDiscordFormItems,
   feishu: getFeishuFormItems,
@@ -82,14 +82,14 @@ const platformFormItemsMap: Record<
 
 interface BodyProps {
   currentConfig?: { enabled: boolean };
-  form: FormInstance<IntegrationFormValues>;
+  form: FormInstance<ChannelFormValues>;
   hasConfig: boolean;
   onCopied: () => void;
   onDelete: () => void;
   onSave: () => void;
   onTestConnection: () => void;
   onToggleEnable: (enabled: boolean) => void;
-  provider: IntegrationProvider;
+  provider: ChannelProvider;
   saveResult?: TestResult;
   saving: boolean;
   testing: boolean;
@@ -169,7 +169,7 @@ const Body = memo<BodyProps>(
           <div className={styles.actionBar}>
             {hasConfig ? (
               <Button danger icon={<Trash2 size={16} />} type="primary" onClick={onDelete}>
-                {t('channel.removeIntegration')}
+                {t('channel.removeChannel')}
               </Button>
             ) : (
               <div />
