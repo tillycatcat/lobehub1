@@ -1,10 +1,11 @@
-import { FilesTabs, QueryFileListParams, SortType } from '@lobechat/types';
+import type { QueryFileListParams } from '@lobechat/types';
+import { FilesTabs, SortType } from '@lobechat/types';
 import { sql } from 'drizzle-orm';
 
 import { DocumentModel } from '../../models/document';
 import { FileModel } from '../../models/file';
 import { documents, files, knowledgeBaseFiles } from '../../schemas';
-import { LobeChatDatabase } from '../../type';
+import type { LobeChatDatabase } from '../../type';
 
 export interface KnowledgeItem {
   chunkTaskId?: string | null;
@@ -29,7 +30,7 @@ export interface KnowledgeItem {
 }
 
 /**
- * Knowledge Repository - combines files and documents into a unified interface
+ * Resources Repository - combines files and documents into a unified interface
  */
 export class KnowledgeRepo {
   private userId: string;
@@ -202,7 +203,7 @@ export class KnowledgeRepo {
       FROM ${documents}
       WHERE user_id = ${this.userId}
         AND source_type != ${'file'}
-        AND (metadata->>'knowledgeBaseId') IS NULL
+        AND knowledge_base_id IS NULL
     `;
 
     const combinedQuery = sql`
@@ -305,7 +306,7 @@ export class KnowledgeRepo {
     showFilesInKnowledgeBase,
     parentId,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
-    let whereConditions: any[] = [sql`f.user_id = ${this.userId}`];
+    const whereConditions: any[] = [sql`f.user_id = ${this.userId}`];
 
     // Parent ID filter
     if (parentId !== undefined) {
@@ -432,7 +433,7 @@ export class KnowledgeRepo {
     knowledgeBaseId,
     parentId,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
-    let whereConditions: any[] = [
+    const whereConditions: any[] = [
       sql`${documents.userId} = ${this.userId}`,
       sql`${documents.sourceType} != ${'file'}`,
     ];
@@ -554,12 +555,9 @@ export class KnowledgeRepo {
       }
 
       // When in a knowledge base, return standalone documents (folders and notes without fileId)
-      // that have the knowledgeBaseId set in their metadata. Documents with fileId are already
+      // that have the knowledgeBaseId column set. Documents with fileId are already
       // returned by the file query via their linked file records.
-      kbWhereConditions.push(
-        sql`d.file_id IS NULL`,
-        sql`d.metadata->>'knowledgeBaseId' = ${knowledgeBaseId}`,
-      );
+      kbWhereConditions.push(sql`d.file_id IS NULL`, sql`d.knowledge_base_id = ${knowledgeBaseId}`);
 
       return sql`
         SELECT

@@ -1,8 +1,8 @@
+import { type ActionIconGroupEvent } from '@lobehub/ui';
 import { ActionIconGroup } from '@lobehub/ui';
-import type { ActionIconGroupEvent } from '@lobehub/ui';
 import { memo } from 'react';
 
-import type { AssistantActions } from './useAssistantActions';
+import { type AssistantActions } from './useAssistantActions';
 
 interface ErrorActionsBarProps {
   actions: AssistantActions;
@@ -15,9 +15,7 @@ export const ErrorActionsBar = memo<ErrorActionsBarProps>(({ actions, onActionCl
   return (
     <ActionIconGroup
       items={[regenerate, del]}
-      menu={{
-        items: [edit, copy, divider, del],
-      }}
+      menu={[edit, copy, divider, del]}
       onActionClick={onActionClick}
     />
   );

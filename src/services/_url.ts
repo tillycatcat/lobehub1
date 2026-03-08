@@ -1,7 +1,5 @@
 import { withElectronProtocolIfElectron } from '@/const/protocol';
 
-/* eslint-disable sort-keys-fix/sort-keys-fix */
-
 export const API_ENDPOINTS = {
   oauth: withElectronProtocolIfElectron('/api/auth'),
 
@@ -20,9 +18,6 @@ export const API_ENDPOINTS = {
   models: (provider: string) => withElectronProtocolIfElectron(`/webapi/models/${provider}`),
   modelPull: (provider: string) =>
     withElectronProtocolIfElectron(`/webapi/models/${provider}/pull`),
-
-  // image
-  images: (provider: string) => withElectronProtocolIfElectron(`/webapi/text-to-image/${provider}`),
 
   // STT
   stt: withElectronProtocolIfElectron('/webapi/stt/openai'),

@@ -1,7 +1,6 @@
-import { t } from 'i18next';
 import { describe, expect, it } from 'vitest';
 
-import { ChatStore } from '@/store/chat';
+import { type ChatStore } from '@/store/chat';
 import { initialState } from '@/store/chat/initialState';
 import { topicMapKey } from '@/store/chat/utils/topicMapKey';
 import { merge } from '@/utils/merge';
@@ -35,7 +34,7 @@ const topicDataMap = createTopicDataMap('test');
 
 describe('topicSelectors', () => {
   describe('currentTopics', () => {
-    it('should return undefined if there are no topics with activeId', () => {
+    it('should return undefined if there are no topics with activeAgentId', () => {
       const topics = topicSelectors.currentTopics(initialStore);
       expect(topics).toBeUndefined();
     });

@@ -1,7 +1,7 @@
 'use client';
 
-import { Dropdown, Icon, type MenuProps, Tag } from '@lobehub/ui';
-import { Center } from '@lobehub/ui';
+import { type MenuProps } from '@lobehub/ui';
+import { Center, DropdownMenu, Icon, Tag } from '@lobehub/ui';
 import isEqual from 'fast-deep-equal';
 import { LucideToyBrick } from 'lucide-react';
 import { memo } from 'react';
@@ -49,15 +49,13 @@ const PluginTag = memo<PluginTagProps>(({ plugins }) => {
   const count = plugins.length;
 
   return (
-    <Dropdown menu={{ items }}>
-      <div>
-        <Tag>
-          {<Icon icon={LucideToyBrick} />}
-          {pluginHelpers.getPluginTitle(displayPlugin) || plugins[0]}
-          {count > 1 && <div>({plugins.length - 1}+)</div>}
-        </Tag>
-      </div>
-    </Dropdown>
+    <DropdownMenu items={items}>
+      <Tag style={{ cursor: 'pointer' }}>
+        {<Icon icon={LucideToyBrick} />}
+        {pluginHelpers.getPluginTitle(displayPlugin) || plugins[0]}
+        {count > 1 && <div>({plugins.length - 1}+)</div>}
+      </Tag>
+    </DropdownMenu>
   );
 });
 

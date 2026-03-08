@@ -1,14 +1,11 @@
 import { type AssistantContentBlock, type UIChatMessage } from '@lobechat/types';
 
-import { DEFAULT_USER_AVATAR } from '@/const/meta';
 import { INBOX_SESSION_ID } from '@/const/session';
 import { useAgentStore } from '@/store/agent';
-import { agentChatConfigSelectors, agentSelectors } from '@/store/agent/selectors';
-import { useUserStore } from '@/store/user';
-import { userProfileSelectors } from '@/store/user/selectors';
+import { agentChatConfigSelectors } from '@/store/agent/selectors';
 
 import { chatHelpers } from '../../../helpers';
-import type { ChatStoreState } from '../../../initialState';
+import { type ChatStoreState } from '../../../initialState';
 import { messageMapKey } from '../../../utils/messageMapKey';
 
 /**
@@ -18,54 +15,32 @@ import { messageMapKey } from '../../../utils/messageMapKey';
  * Use these selectors when you need to:
  * - Render messages in UI components
  * - Display assistantGroup messages with children
- * - Show messages with proper meta information
  * - Present message history with filters
  *
  * DO NOT use these for data mutations - use dbMessage.ts selectors instead.
  */
 
-// ============= Meta Information ========== //
-
-const getMeta = (message: UIChatMessage) => {
-  switch (message.role) {
-    case 'user': {
-      return {
-        avatar: userProfileSelectors.userAvatar(useUserStore.getState()) || DEFAULT_USER_AVATAR,
-      };
-    }
-
-    case 'system': {
-      return message.meta;
-    }
-
-    default: {
-      // For group chat, get meta from agent store by agentId
-      if (message.groupId && message.agentId) {
-        return agentSelectors.getAgentMetaById(message.agentId)(useAgentStore.getState());
-      }
-
-      // Otherwise, use the current agent's meta for single agent chat
-      return agentSelectors.currentAgentMeta(useAgentStore.getState());
-    }
-  }
-};
-
 // ============= Basic Display Message Access ========== //
 
 /**
  * Get the current chat key for accessing messagesMap
+ * For group conversations, uses groupId to generate the correct key
  */
 export const currentDisplayChatKey = (s: ChatStoreState) =>
-  messageMapKey({ agentId: s.activeAgentId, topicId: s.activeTopicId });
+  messageMapKey({
+    agentId: s.activeAgentId,
+    groupId: s.activeGroupId,
+    threadId: s.activeThreadId,
+    topicId: s.activeTopicId,
+  });
 
 /**
- * Get display messages by key (with meta information)
+ * Get display messages by key
  */
 const getDisplayMessagesByKey =
   (key: string) =>
   (s: ChatStoreState): UIChatMessage[] => {
-    const messages = s.messagesMap[key] || [];
-    return messages.map((i) => ({ ...i, meta: getMeta(i) }));
+    return s.messagesMap[key] || [];
   };
 
 /**
@@ -93,7 +68,7 @@ const lastDisplayMessageId = (s: ChatStoreState) => {
 // ============= Thread Handling ========== //
 
 const getChatsWithThread = (s: ChatStoreState, messages: UIChatMessage[]) => {
-  // 如果没有 activeThreadId，则返回所有的主消息
+  // If there is no activeThreadId, return all top-level messages
   if (!s.activeThreadId) return messages.filter((m) => !m.threadId);
 
   const thread = s.threadMaps[s.activeTopicId!]?.find((t) => t.id === s.activeThreadId);
@@ -272,7 +247,7 @@ const findLastBlockId = (block: AssistantContentBlock | undefined): string | und
 
 /**
  * Recursively finds the last message ID in a message tree
- * Priority: children > tools > self
+ * Priority: children > tools > compressedGroup.lastMessageId > self
  */
 const findLastMessageIdRecursive = (node: UIChatMessage | undefined): string | undefined => {
   if (!node) return undefined;
@@ -289,7 +264,12 @@ const findLastMessageIdRecursive = (node: UIChatMessage | undefined): string | u
     return lastTool?.result_msg_id;
   }
 
-  // Priority 3: Return self ID
+  // Priority 3: For compressedGroup, return lastMessageId instead of group ID
+  if (node.role === 'compressedGroup' && 'lastMessageId' in node) {
+    return (node as any).lastMessageId;
+  }
+
+  // Priority 4: Return self ID
   return node.id;
 };
 

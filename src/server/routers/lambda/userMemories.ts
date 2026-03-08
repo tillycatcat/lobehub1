@@ -3,8 +3,11 @@ import {
   DEFAULT_SEARCH_USER_MEMORY_TOP_K,
   DEFAULT_USER_MEMORY_EMBEDDING_DIMENSIONS,
   DEFAULT_USER_MEMORY_EMBEDDING_MODEL_ITEM,
+  MEMORY_SEARCH_TOP_K_LIMITS,
 } from '@lobechat/const';
+import { type LobeChatDatabase } from '@lobechat/database';
 import {
+  ActivityMemoryItemSchema,
   AddIdentityActionSchema,
   ContextMemoryItemSchema,
   ExperienceMemoryItemSchema,
@@ -12,47 +15,77 @@ import {
   RemoveIdentityActionSchema,
   UpdateIdentityActionSchema,
 } from '@lobechat/memory-user-memory';
-import { LayersEnum, type SearchMemoryResult, searchMemorySchema } from '@lobechat/types';
-import { type SQL, and, asc, eq, gte, lte } from 'drizzle-orm';
-import { ModelProvider } from 'model-bank';
+import { type SearchMemoryResult } from '@lobechat/types';
+import { LayersEnum, searchMemorySchema } from '@lobechat/types';
+import { type SQL } from 'drizzle-orm';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import pMap from 'p-map';
 import { z } from 'zod';
 
 import {
   type IdentityEntryBasePayload,
   type IdentityEntryPayload,
+} from '@/database/models/userMemory';
+import {
+  UserMemoryActivityModel,
+  UserMemoryExperienceModel,
   UserMemoryIdentityModel,
   UserMemoryModel,
 } from '@/database/models/userMemory';
 import { UserMemoryTopicRepository } from '@/database/repositories/userMemory';
 import {
   userMemories,
+  userMemoriesActivities,
   userMemoriesContexts,
   userMemoriesExperiences,
   userMemoriesIdentities,
   userMemoriesPreferences,
+  userSettings,
 } from '@/database/schemas';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
-import { keyVaults, serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { getServerDefaultFilesConfig } from '@/server/globalConfig';
-import { initModelRuntimeWithUserPayload } from '@/server/modules/ModelRuntime';
-import { type ClientSecretPayload } from '@/types/auth';
+import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 
 const EMPTY_SEARCH_RESULT: SearchMemoryResult = {
+  activities: [],
   contexts: [],
   experiences: [],
   preferences: [],
 };
 
 type MemorySearchContext = {
-  jwtPayload: ClientSecretPayload;
   memoryModel: UserMemoryModel;
+  memoryEffort: MemoryEffort;
+  serverDB: LobeChatDatabase;
+  userId: string;
 };
 
 type MemorySearchResult = Awaited<ReturnType<UserMemoryModel['searchWithEmbedding']>>;
 
 const mapMemorySearchResult = (layeredResults: MemorySearchResult): SearchMemoryResult => {
   return {
+    activities: layeredResults.activities.map((activity) => ({
+      accessedAt: activity.accessedAt,
+      associatedLocations: activity.associatedLocations,
+      associatedObjects: activity.associatedObjects,
+      associatedSubjects: activity.associatedSubjects,
+      capturedAt: activity.capturedAt,
+      createdAt: activity.createdAt,
+      endsAt: activity.endsAt,
+      feedback: activity.feedback,
+      id: activity.id,
+      metadata: activity.metadata,
+      narrative: activity.narrative,
+      notes: activity.notes,
+      startsAt: activity.startsAt,
+      status: activity.status,
+      tags: activity.tags,
+      timezone: activity.timezone,
+      type: activity.type,
+      updatedAt: activity.updatedAt,
+      userMemoryId: activity.userMemoryId,
+    })),
     contexts: layeredResults.contexts.map((context) => ({
       accessedAt: context.accessedAt,
       associatedObjects: context.associatedObjects,
@@ -104,42 +137,71 @@ const mapMemorySearchResult = (layeredResults: MemorySearchResult): SearchMemory
   } satisfies SearchMemoryResult;
 };
 
+type MemoryEffort = 'high' | 'low' | 'medium';
+
+const normalizeMemoryEffort = (value: unknown): MemoryEffort => {
+  if (value === 'low' || value === 'medium' || value === 'high') return value;
+  return 'medium';
+};
+
+const applySearchLimitsByEffort = (
+  effort: MemoryEffort,
+  requested: { activities: number; contexts: number; experiences: number; preferences: number },
+) => {
+  const limit = MEMORY_SEARCH_TOP_K_LIMITS[effort];
+
+  return {
+    activities: Math.min(requested.activities, limit.activities),
+    contexts: Math.min(requested.contexts, limit.contexts),
+    experiences: Math.min(requested.experiences, limit.experiences),
+    preferences: Math.min(requested.preferences, limit.preferences),
+  };
+};
+
 const searchUserMemories = async (
   ctx: MemorySearchContext,
   input: z.infer<typeof searchMemorySchema>,
 ): Promise<SearchMemoryResult> => {
-  const agentRuntime = await initModelRuntimeWithUserPayload(ModelProvider.OpenAI, ctx.jwtPayload);
-
-  const { model: embeddingModel } =
+  const { provider, model: embeddingModel } =
     getServerDefaultFilesConfig().embeddingModel || DEFAULT_USER_MEMORY_EMBEDDING_MODEL_ITEM;
+  // Read user's provider config from database
+  const modelRuntime = await initModelRuntimeFromDB(ctx.serverDB, ctx.userId, provider);
 
-  const queryEmbeddings = await agentRuntime.embeddings({
+  const queryEmbeddings = await modelRuntime.embeddings({
     dimensions: DEFAULT_USER_MEMORY_EMBEDDING_DIMENSIONS,
     input: input.query,
     model: embeddingModel,
   });
 
-  const limits = {
-    contexts: input.topK?.contexts,
-    experiences: input.topK?.experiences,
-    preferences: input.topK?.preferences,
+  const effectiveEffort = normalizeMemoryEffort(input.effort ?? ctx.memoryEffort);
+  const effortDefaults = MEMORY_SEARCH_TOP_K_LIMITS[effectiveEffort];
+
+  const requestedLimits = {
+    activities: input.topK?.activities ?? effortDefaults.activities,
+    contexts: input.topK?.contexts ?? effortDefaults.contexts,
+    experiences: input.topK?.experiences ?? effortDefaults.experiences,
+    preferences: input.topK?.preferences ?? effortDefaults.preferences,
   };
+
+  const effortConstrainedLimits = applySearchLimitsByEffort(effectiveEffort, requestedLimits);
 
   const layeredResults = await ctx.memoryModel.searchWithEmbedding({
     embedding: queryEmbeddings?.[0],
-    limits,
+    limits: effortConstrainedLimits,
   });
 
   return mapMemorySearchResult(layeredResults);
 };
 
-const getEmbeddingRuntime = async (jwtPayload: ClientSecretPayload) => {
-  const agentRuntime = await initModelRuntimeWithUserPayload(
-    ENABLE_BUSINESS_FEATURES ? BRANDING_PROVIDER : ModelProvider.OpenAI,
-    jwtPayload,
-  );
-  const { model: embeddingModel } =
+const getEmbeddingRuntime = async (serverDB: LobeChatDatabase, userId: string) => {
+  const { provider, model: embeddingModel } =
     getServerDefaultFilesConfig().embeddingModel || DEFAULT_USER_MEMORY_EMBEDDING_MODEL_ITEM;
+  // Read user's provider config from database
+  const agentRuntime = await initModelRuntimeFromDB(
+    serverDB,
+    userId,
+    ENABLE_BUSINESS_FEATURES ? BRANDING_PROVIDER : provider,
+  );
 
   return { agentRuntime, embeddingModel };
 };
@@ -164,6 +226,7 @@ const REEMBED_TABLE_KEYS = [
   'preferences',
   'identities',
   'experiences',
+  'activities',
 ] as const;
 type ReEmbedTableKey = (typeof REEMBED_TABLE_KEYS)[number];
 
@@ -197,17 +260,28 @@ const normalizeEmbeddable = (value?: string | null): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-const memoryProcedure = authedProcedure
-  .use(serverDatabase)
-  .use(keyVaults)
-  .use(async (opts) => {
-    const { ctx } = opts;
-    return opts.next({
-      ctx: {
-        memoryModel: new UserMemoryModel(ctx.serverDB, ctx.userId),
-      },
-    });
+const memoryProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+  const { ctx } = opts;
+  const userSettingsRow = await ctx.serverDB.query.userSettings.findFirst({
+    columns: { memory: true },
+    where: eq(userSettings.id, ctx.userId),
   });
+  const memoryConfig =
+    typeof userSettingsRow?.memory === 'object' && userSettingsRow?.memory !== null
+      ? (userSettingsRow.memory as { effort?: unknown })
+      : undefined;
+  const memoryEffort = normalizeMemoryEffort(memoryConfig?.effort);
+
+  return opts.next({
+    ctx: {
+      activityModel: new UserMemoryActivityModel(ctx.serverDB, ctx.userId),
+      experienceModel: new UserMemoryExperienceModel(ctx.serverDB, ctx.userId),
+      identityModel: new UserMemoryIdentityModel(ctx.serverDB, ctx.userId),
+      memoryModel: new UserMemoryModel(ctx.serverDB, ctx.userId),
+      memoryEffort,
+    },
+  });
+});
 
 export const userMemoriesRouter = router({
   getMemoryDetail: memoryProcedure
@@ -221,13 +295,94 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  queryIdentitiesForInjection: authedProcedure
-    .use(serverDatabase)
+  queryActivities: memoryProcedure
+    .input(
+      z
+        .object({
+          order: z.enum(['asc', 'desc']).optional(),
+          page: z.coerce.number().int().min(1).optional(),
+          pageSize: z.coerce.number().int().min(1).max(100).optional(),
+          q: z.string().optional(),
+          sort: z.enum(['capturedAt', 'startsAt']).optional(),
+          status: z.array(z.string()).optional(),
+          tags: z.array(z.string()).optional(),
+          types: z.array(z.string()).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const params = input ?? {};
+      const fallbackPage = params.page ?? 1;
+      const fallbackPageSize = params.pageSize ?? 20;
+
+      try {
+        return await ctx.activityModel.queryList(params);
+      } catch (error) {
+        console.error('Failed to query activities:', error);
+        return { items: [], page: fallbackPage, pageSize: fallbackPageSize, total: 0 };
+      }
+    }),
+
+  queryExperiences: memoryProcedure
+    .input(
+      z
+        .object({
+          order: z.enum(['asc', 'desc']).optional(),
+          page: z.coerce.number().int().min(1).optional(),
+          pageSize: z.coerce.number().int().min(1).max(100).optional(),
+          q: z.string().optional(),
+          sort: z.enum(['capturedAt', 'scoreConfidence']).optional(),
+          tags: z.array(z.string()).optional(),
+          types: z.array(z.string()).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const params = input ?? {};
+      const fallbackPage = params.page ?? 1;
+      const fallbackPageSize = params.pageSize ?? 20;
+
+      try {
+        return await ctx.experienceModel.queryList(params);
+      } catch (error) {
+        console.error('Failed to query experiences:', error);
+        return { items: [], page: fallbackPage, pageSize: fallbackPageSize, total: 0 };
+      }
+    }),
+
+  queryIdentities: memoryProcedure
+    .input(
+      z
+        .object({
+          order: z.enum(['asc', 'desc']).optional(),
+          page: z.coerce.number().int().min(1).optional(),
+          pageSize: z.coerce.number().int().min(1).max(100).optional(),
+          q: z.string().optional(),
+          relationships: z.array(z.string()).optional(),
+          sort: z.enum(['capturedAt', 'type']).optional(),
+          tags: z.array(z.string()).optional(),
+          types: z.array(z.string()).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const params = input ?? {};
+      const fallbackPage = params.page ?? 1;
+      const fallbackPageSize = params.pageSize ?? 20;
+
+      try {
+        return await ctx.identityModel.queryList(params);
+      } catch (error) {
+        console.error('Failed to query identities:', error);
+        return { items: [], page: fallbackPage, pageSize: fallbackPageSize, total: 0 };
+      }
+    }),
+
+  queryIdentitiesForInjection: memoryProcedure
     .input(z.object({ limit: z.coerce.number().int().min(1).max(100).optional() }).optional())
     .query(async ({ ctx, input }) => {
       try {
-        const identityModel = new UserMemoryIdentityModel(ctx.serverDB, ctx.userId);
-        return await identityModel.queryForInjection(input?.limit ?? 50);
+        return await ctx.identityModel.queryForInjection(input?.limit ?? 50);
       } catch (error) {
         console.error('Failed to query identities for injection:', error);
         return [];
@@ -263,8 +418,16 @@ export const userMemoriesRouter = router({
           pageSize: z.coerce.number().int().min(1).max(100).optional(),
           q: z.string().optional(),
           sort: z
-            .enum(['scoreConfidence', 'scoreImpact', 'scorePriority', 'scoreUrgency'])
+            .enum([
+              'capturedAt',
+              'scoreConfidence',
+              'scoreImpact',
+              'scorePriority',
+              'scoreUrgency',
+              'startsAt',
+            ])
             .optional(),
+          status: z.array(z.string()).optional(),
           tags: z.array(z.string()).optional(),
           types: z.array(z.string()).optional(),
         })
@@ -306,17 +469,15 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  // REVIEW：根据当前 topic 直接提取记忆
-  // REVIEW： 我们需要一个既可以 cron 也可以主动用户触发进行「每日/每周/每隔一段时间的」记忆提取/生成的函数实现
-  // REVIEW： 定时任务
-  // 不用 tRPC，直接 server/service
-  // 可以参考 https://github.com/lobehub/lobe-chat-cloud/blob/886ff2fcd44b7b00a3aa8906f84914a6dcaa1815/src/app/(backend)/cron/reset-budgets/route.ts#L214
   reEmbedMemories: memoryProcedure
     .input(reEmbedInputSchema.optional())
     .mutation(async ({ ctx, input }) => {
       try {
         const options = input ?? {};
-        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(ctx.jwtPayload);
+        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(
+          ctx.serverDB,
+          ctx.userId,
+        );
         const concurrency = options.concurrency ?? 10;
         const shouldProcess = (key: ReEmbedTableKey) =>
           !options.only || options.only.length === 0 || options.only.includes(key);
@@ -581,6 +742,73 @@ export const userMemoriesRouter = router({
           } satisfies ReEmbedStats;
         });
 
+        await run('activities', async () => {
+          const where = combineConditions([
+            eq(userMemoriesActivities.userId, ctx.userId),
+            options.startDate
+              ? gte(userMemoriesActivities.createdAt, options.startDate)
+              : undefined,
+            options.endDate ? lte(userMemoriesActivities.createdAt, options.endDate) : undefined,
+          ]);
+
+          const rows = await ctx.serverDB.query.userMemoriesActivities.findMany({
+            columns: { feedback: true, id: true, narrative: true },
+            limit: options.limit,
+            orderBy: [asc(userMemoriesActivities.createdAt)],
+            where,
+          });
+
+          let succeeded = 0;
+          let failed = 0;
+          let skipped = 0;
+
+          await pMap(
+            rows,
+            async (row) => {
+              const narrative = normalizeEmbeddable(row.narrative);
+              const feedback = normalizeEmbeddable(row.feedback);
+
+              try {
+                if (!narrative && !feedback) {
+                  await ctx.memoryModel.updateActivityVectors(row.id, {
+                    feedbackVector: null,
+                    narrativeVector: null,
+                  });
+                  skipped += 1;
+                  return;
+                }
+
+                const inputs: string[] = [];
+                if (narrative) inputs.push(narrative);
+                if (feedback) inputs.push(feedback);
+
+                const embeddings = await embedTexts(inputs);
+                let embedIndex = 0;
+
+                const narrativeVector = narrative ? (embeddings[embedIndex++] ?? null) : null;
+                const feedbackVector = feedback ? (embeddings[embedIndex++] ?? null) : null;
+
+                await ctx.memoryModel.updateActivityVectors(row.id, {
+                  feedbackVector,
+                  narrativeVector,
+                });
+                succeeded += 1;
+              } catch (err) {
+                failed += 1;
+                console.error(`[memoryRouter.reEmbed] Failed to re-embed activity ${row.id}`, err);
+              }
+            },
+            { concurrency },
+          );
+
+          return {
+            failed,
+            skipped,
+            succeeded,
+            total: rows.length,
+          } satisfies ReEmbedStats;
+        });
+
         await run('experiences', async () => {
           const where = combineConditions([
             eq(userMemoriesExperiences.userId, ctx.userId),
@@ -729,21 +957,88 @@ export const userMemoriesRouter = router({
       }
     }),
 
-  searchMemory: memoryProcedure.input(searchMemorySchema).query(async ({ input, ctx }) => {
-    try {
-      return await searchUserMemories(ctx, input);
-    } catch (error) {
-      console.error('Failed to retrieve memories:', error);
-      return EMPTY_SEARCH_RESULT;
+  searchMemory: memoryProcedure
+    .input(searchMemorySchema)
+    .query(async ({ input, ctx }) => {
+      try {
+        return await searchUserMemories(ctx, input);
+      } catch (error) {
+        console.error('Failed to retrieve memories:', error);
+        return EMPTY_SEARCH_RESULT;
+      }
     }
-  }),
+  ),
 
-  // REVIEW: 需要实现 tool memory api
+  toolAddActivityMemory: memoryProcedure
+    .input(ActivityMemoryItemSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(
+          ctx.serverDB,
+          ctx.userId,
+        );
+        const embed = createEmbedder(agentRuntime, embeddingModel);
+
+        const summaryEmbedding = await embed(input.summary);
+        const detailsEmbedding = await embed(input.details);
+        const narrativeVector = await embed(input.withActivity.narrative);
+        const feedbackVector = await embed(input.withActivity.feedback);
+
+        const { activity, memory } = await ctx.memoryModel.createActivityMemory({
+          activity: {
+            associatedLocations:
+              UserMemoryModel.parseAssociatedLocations(input.withActivity.associatedLocations) ??
+              null,
+            associatedObjects:
+              UserMemoryModel.parseAssociatedObjects(input.withActivity.associatedObjects) ?? [],
+            associatedSubjects:
+              UserMemoryModel.parseAssociatedSubjects(input.withActivity.associatedSubjects) ?? [],
+            endsAt: UserMemoryModel.parseDateFromString(input.withActivity.endsAt ?? undefined),
+            feedback: input.withActivity.feedback ?? null,
+            feedbackVector: feedbackVector ?? null,
+            metadata: input.withActivity.metadata ?? null,
+            narrative: input.withActivity.narrative ?? null,
+            narrativeVector: narrativeVector ?? null,
+            notes: input.withActivity.notes ?? null,
+            startsAt: UserMemoryModel.parseDateFromString(input.withActivity.startsAt ?? undefined),
+            status: input.withActivity.status ?? 'pending',
+            tags: input.withActivity.tags ?? input.tags ?? [],
+            timezone: input.withActivity.timezone ?? null,
+            type: input.withActivity.type ?? 'other',
+          },
+          details: input.details || '',
+          detailsEmbedding,
+          memoryCategory: input.memoryCategory,
+          memoryLayer: LayersEnum.Activity,
+          memoryType: input.memoryType,
+          summary: input.summary,
+          summaryEmbedding,
+          title: input.title,
+        });
+
+        return {
+          activityId: activity.id,
+          memoryId: memory.id,
+          message: 'Memory saved successfully',
+          success: true,
+        };
+      } catch (error) {
+        console.error('Failed to save memory:', error);
+        return {
+          message: `Failed to save memory: ${(error as Error).message}`,
+          success: false,
+        };
+      }
+    }),
+
   toolAddContextMemory: memoryProcedure
     .input(ContextMemoryItemSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(ctx.jwtPayload);
+        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(
+          ctx.serverDB,
+          ctx.userId,
+        );
         const embed = createEmbedder(agentRuntime, embeddingModel);
 
         const summaryEmbedding = await embed(input.summary);
@@ -769,7 +1064,7 @@ export const userMemoriesRouter = router({
           details: input.details || '',
           detailsEmbedding,
           memoryCategory: input.memoryCategory,
-          memoryLayer: input.memoryLayer,
+          memoryLayer: LayersEnum.Context,
           memoryType: input.memoryType,
           summary: input.summary,
           summaryEmbedding,
@@ -795,7 +1090,10 @@ export const userMemoriesRouter = router({
     .input(ExperienceMemoryItemSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(ctx.jwtPayload);
+        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(
+          ctx.serverDB,
+          ctx.userId,
+        );
         const embed = createEmbedder(agentRuntime, embeddingModel);
 
         const summaryEmbedding = await embed(input.summary);
@@ -822,7 +1120,7 @@ export const userMemoriesRouter = router({
             type: input.memoryType,
           },
           memoryCategory: input.memoryCategory,
-          memoryLayer: input.memoryLayer,
+          memoryLayer: LayersEnum.Experience,
           memoryType: input.memoryType,
           summary: input.summary,
           summaryEmbedding,
@@ -848,7 +1146,10 @@ export const userMemoriesRouter = router({
     .input(AddIdentityActionSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(ctx.jwtPayload);
+        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(
+          ctx.serverDB,
+          ctx.userId,
+        );
         const embed = createEmbedder(agentRuntime, embeddingModel);
 
         const summaryEmbedding = await embed(input.summary);
@@ -874,7 +1175,7 @@ export const userMemoriesRouter = router({
             details: input.details,
             detailsVector1024: detailsEmbedding ?? null,
             memoryCategory: input.memoryCategory,
-            memoryLayer: input.memoryLayer,
+            memoryLayer: LayersEnum.Identity,
             memoryType: input.memoryType,
             metadata: Object.keys(identityMetadata).length > 0 ? identityMetadata : undefined,
             summary: input.summary,
@@ -913,7 +1214,10 @@ export const userMemoriesRouter = router({
     .input(PreferenceMemoryItemSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(ctx.jwtPayload);
+        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(
+          ctx.serverDB,
+          ctx.userId,
+        );
         const embed = createEmbedder(agentRuntime, embeddingModel);
 
         const summaryEmbedding = await embed(input.summary);
@@ -935,7 +1239,7 @@ export const userMemoriesRouter = router({
           details: input.details || '',
           detailsEmbedding,
           memoryCategory: input.memoryCategory,
-          memoryLayer: input.memoryLayer,
+          memoryLayer: LayersEnum.Preference,
           memoryType: input.memoryType,
           preference: {
             conclusionDirectives: input.withPreference.conclusionDirectives || '',
@@ -1003,7 +1307,10 @@ export const userMemoriesRouter = router({
     .input(UpdateIdentityActionSchema)
     .mutation(async ({ input, ctx }) => {
       try {
-        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(ctx.jwtPayload);
+        const { agentRuntime, embeddingModel } = await getEmbeddingRuntime(
+          ctx.serverDB,
+          ctx.userId,
+        );
         const embed = createEmbedder(agentRuntime, embeddingModel);
 
         let summaryVector1024: number[] | null | undefined;

@@ -2,14 +2,15 @@ import type {
   AiProviderDetailItem,
   AiProviderListItem,
   AiProviderRuntimeConfig,
+  AiProviderRuntimeState,
   EnabledProvider,
 } from '@lobechat/types';
-import { AiProviderModelListItem, EnabledAiModel } from 'model-bank';
+import type { AiProviderModelListItem, EnabledAiModel, ExtendParamsType } from 'model-bank';
 import { DEFAULT_MODEL_PROVIDER_LIST } from 'model-bank/modelProviders';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clientDB, initializeDB } from '@/database/client/db';
-
+import { getTestDB } from '../../core/getTestDB';
+import type { LobeChatDatabase } from '../../type';
 import { AiInfraRepos } from './index';
 
 const userId = 'test-user-id';
@@ -18,14 +19,17 @@ const mockProviderConfigs = {
   anthropic: { enabled: false },
 };
 
+let serverDB: LobeChatDatabase;
 let repo: AiInfraRepos;
 
-beforeEach(async () => {
-  await initializeDB();
-  vi.clearAllMocks();
-
-  repo = new AiInfraRepos(clientDB as any, userId, mockProviderConfigs);
+beforeAll(async () => {
+  serverDB = await getTestDB();
 }, 30000);
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  repo = new AiInfraRepos(serverDB, userId, mockProviderConfigs);
+});
 
 describe('AiInfraRepos', () => {
   describe('getAiProviderList', () => {
@@ -796,6 +800,46 @@ describe('AiInfraRepos', () => {
       expect(merged).toBeDefined();
       // 应该使用内置的 settings
       expect(merged?.settings).toEqual({ searchImpl: 'tool', searchProvider: 'google' });
+    });
+
+    it('should merge builtin settings with user-provided extend params', async () => {
+      const mockProviders = [
+        { enabled: true, id: 'openai', name: 'OpenAI', source: 'builtin' as const },
+      ];
+
+      const userModel: EnabledAiModel = {
+        abilities: {},
+        id: 'gpt-4',
+        providerId: 'openai',
+        enabled: true,
+        type: 'chat',
+        settings: { extendParams: ['reasoningEffort'] as ExtendParamsType[] },
+      };
+
+      const builtinModel = {
+        id: 'gpt-4',
+        enabled: true,
+        type: 'chat' as const,
+        settings: {
+          extendParams: ['thinking'] as ExtendParamsType[],
+          searchImpl: 'params',
+          searchProvider: 'builtin-provider',
+        },
+      };
+
+      vi.spyOn(repo, 'getAiProviderList').mockResolvedValue(mockProviders);
+      vi.spyOn(repo.aiModelModel, 'getAllModels').mockResolvedValue([userModel]);
+      vi.spyOn(repo as any, 'fetchBuiltinModels').mockResolvedValue([builtinModel]);
+
+      const result = await repo.getEnabledModels();
+
+      const merged = result.find((m) => m.id === 'gpt-4');
+      expect(merged).toBeDefined();
+      expect(merged?.settings).toEqual({
+        extendParams: ['reasoningEffort'],
+        searchImpl: 'params',
+        searchProvider: 'builtin-provider',
+      });
     });
 
     it('should have no settings when both user and builtin have no settings', async () => {
@@ -1584,6 +1628,7 @@ describe('AiInfraRepos', () => {
           { id: 'openai', logo: 'logo1', name: 'OpenAI', source: 'builtin' },
         ],
         enabledImageAiProviders: [],
+        enabledVideoAiProviders: [],
         runtimeConfig: {
           openai: {
             apiKey: 'test-key',
@@ -1674,6 +1719,7 @@ describe('AiInfraRepos', () => {
             name: 'Fal',
           }),
         ],
+        enabledVideoAiProviders: [],
         runtimeConfig: {
           fal: {
             apiKey: 'test-fal-key',
@@ -1729,6 +1775,58 @@ describe('AiInfraRepos', () => {
         settings: {},
         source: 'builtin',
       });
+    });
+  });
+
+  describe('AiInfraRepos.tryMatchingProviderFrom', () => {
+    const createRuntimeState = (models: EnabledAiModel[]): AiProviderRuntimeState => ({
+      enabledAiModels: models,
+      enabledAiProviders: [],
+      enabledChatAiProviders: [],
+      enabledImageAiProviders: [],
+      enabledVideoAiProviders: [],
+      runtimeConfig: {},
+    });
+
+    it('prefers provider order when multiple providers have model', async () => {
+      const runtimeState = createRuntimeState([
+        { abilities: {}, enabled: true, id: 'm-1', type: 'chat', providerId: 'provider-b' },
+        { abilities: {}, enabled: true, id: 'm-1', type: 'chat', providerId: 'provider-a' },
+      ]);
+
+      const providerId = await AiInfraRepos.tryMatchingProviderFrom(runtimeState, {
+        modelId: 'm-1',
+        preferredProviders: ['provider-b', 'provider-a'],
+      });
+
+      expect(providerId).toBe('provider-b');
+    });
+
+    it('ignores disabled models when matching', async () => {
+      const runtimeState = createRuntimeState([
+        { abilities: {}, enabled: false, id: 'm-1', type: 'chat', providerId: 'provider-disabled' },
+        { abilities: {}, enabled: true, id: 'm-1', type: 'chat', providerId: 'provider-a' },
+      ]);
+
+      const providerId = await AiInfraRepos.tryMatchingProviderFrom(runtimeState, {
+        modelId: 'm-1',
+        preferredProviders: ['provider-disabled', 'provider-a'],
+      });
+
+      expect(providerId).toBe('provider-a');
+    });
+
+    it('falls back to provided fallback provider when no match', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const runtimeState = createRuntimeState([]);
+
+      const providerId = await AiInfraRepos.tryMatchingProviderFrom(runtimeState, {
+        modelId: 'm-1',
+        fallbackProvider: 'provider-fallback',
+      });
+
+      expect(providerId).toBe('provider-fallback');
+      warnSpy.mockRestore();
     });
   });
 });

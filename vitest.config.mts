@@ -2,6 +2,10 @@ import { dirname, join, resolve } from 'node:path';
 import { coverageConfigDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  optimizeDeps: {
+    exclude: ['crypto', 'util', 'tty'],
+    include: ['@lobehub/tts'],
+  },
   plugins: [
     /**
      * @lobehub/fluent-emoji@4.0.0 ships `es/FluentEmoji/style.js` but its `es/FluentEmoji/index.js`
@@ -27,19 +31,15 @@ export default defineConfig({
           id.endsWith('/FluentEmoji/style/index.js') ||
           id.endsWith('/FluentEmoji/style/index.js?');
 
-        if (isFluentEmojiEntry && isMissingStyleIndex) return resolve(dirname(importer), 'style.js');
+        if (isFluentEmojiEntry && isMissingStyleIndex)
+          return resolve(dirname(importer), 'style.js');
 
         return null;
       },
     },
   ],
-  optimizeDeps: {
-    exclude: ['crypto', 'util', 'tty'],
-    include: ['@lobehub/tts'],
-  },
   test: {
     alias: {
-      /* eslint-disable sort-keys-fix/sort-keys-fix */
       '@/database/_deprecated': resolve(__dirname, './src/database/_deprecated'),
       '@/database': resolve(__dirname, './packages/database/src'),
       '@/utils/client/switchLang': resolve(__dirname, './src/utils/client/switchLang'),
@@ -50,12 +50,15 @@ export default defineConfig({
       '@/utils/server': resolve(__dirname, './src/utils/server'),
       '@/utils/identifier': resolve(__dirname, './src/utils/identifier'),
       '@/utils/electron': resolve(__dirname, './src/utils/electron'),
+      '@/utils/markdownToTxt': resolve(__dirname, './src/utils/markdownToTxt'),
+      '@/utils/sanitizeFileName': resolve(__dirname, './src/utils/sanitizeFileName'),
       '@/utils': resolve(__dirname, './packages/utils/src'),
       '@/types': resolve(__dirname, './packages/types/src'),
       '@/const': resolve(__dirname, './packages/const/src'),
       '@': resolve(__dirname, './src'),
       '~test-utils': resolve(__dirname, './tests/utils.tsx'),
-      /* eslint-enable */
+      'lru_map': resolve(__dirname, './tests/mocks/lru_map'),
+
     },
     coverage: {
       all: false,
@@ -77,20 +80,31 @@ export default defineConfig({
     environment: 'happy-dom',
     exclude: [
       '**/node_modules/**',
+      '**/.*/**',
       '**/dist/**',
       '**/build/**',
       '**/tmp/**',
       '**/temp/**',
-      '**/.temp/**',
+      '**/docs/**',
+      '**/locales/**',
+      '**/public/**',
       '**/apps/desktop/**',
       '**/apps/mobile/**',
+      '**/apps/cli/**',
       '**/packages/**',
       '**/e2e/**',
     ],
     globals: true,
     server: {
       deps: {
-        inline: ['vitest-canvas-mock', '@lobehub/ui', '@lobehub/fluent-emoji'],
+        inline: [
+          'vitest-canvas-mock',
+          '@lobehub/ui',
+          '@lobehub/fluent-emoji',
+          '@pierre/diffs',
+          '@pierre/diffs/react',
+          'lru_map',
+        ],
       },
     },
     setupFiles: join(__dirname, './tests/setup.ts'),

@@ -1,13 +1,17 @@
 import { type UIChatMessage } from '@lobechat/types';
-import { ActionIconGroup } from '@lobehub/ui';
-import type { ActionIconGroupEvent, ActionIconGroupItemType } from '@lobehub/ui';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { type ActionIconGroupEvent, type ActionIconGroupItemType } from '@lobehub/ui';
+import { ActionIconGroup, createRawModal } from '@lobehub/ui';
+import { memo, useCallback, useMemo } from 'react';
 
+import { useEventCallback } from '@/hooks/useEventCallback';
+
+import { type ShareModalProps } from '../../../components/ShareMessageModal';
 import ShareMessageModal from '../../../components/ShareMessageModal';
-import type {
-  MessageActionItem,
-  MessageActionItemOrDivider,
-  MessageActionsConfig,
+import { createStore, Provider, useConversationStoreApi } from '../../../store';
+import {
+  type MessageActionItem,
+  type MessageActionItemOrDivider,
+  type MessageActionsConfig,
 } from '../../../types';
 import { ErrorActionsBar } from './Error';
 import { useAssistantActions } from './useAssistantActions';
@@ -15,16 +19,20 @@ import { useAssistantActions } from './useAssistantActions';
 // Helper to strip handleClick from action items before passing to ActionIconGroup
 const stripHandleClick = (item: MessageActionItemOrDivider): ActionIconGroupItemType => {
   if ('type' in item && item.type === 'divider') return item as unknown as ActionIconGroupItemType;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { handleClick, children, ...rest } = item as MessageActionItem;
+  const { children, ...rest } = item as MessageActionItem;
+  const baseItem = { ...rest } as MessageActionItem;
+  delete (baseItem as { handleClick?: unknown }).handleClick;
   if (children) {
     return {
-      ...rest,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      children: children.map(({ handleClick: _, ...child }) => child),
+      ...baseItem,
+      children: children.map((child) => {
+        const nextChild = { ...child } as MessageActionItem;
+        delete (nextChild as { handleClick?: unknown }).handleClick;
+        return nextChild;
+      }),
     } as ActionIconGroupItemType;
   }
-  return rest as ActionIconGroupItemType;
+  return baseItem as ActionIconGroupItemType;
 };
 
 // Build action items map for handleAction lookup
@@ -56,13 +64,35 @@ interface AssistantActionsBarProps {
 export const AssistantActionsBar = memo<AssistantActionsBarProps>(
   ({ actionsConfig, id, data, index }) => {
     const { error, tools } = data;
-    const [showShareModal, setShareModal] = useState(false);
+    const store = useConversationStoreApi();
+    const handleOpenShareModal = useEventCallback(() => {
+      createRawModal(
+        (props: ShareModalProps) => (
+          <Provider
+            createStore={() => {
+              const state = store.getState();
+              return createStore({
+                context: state.context,
+                hooks: state.hooks,
+                skipFetch: state.skipFetch,
+              });
+            }}
+          >
+            <ShareMessageModal {...props} />
+          </Provider>
+        ),
+        {
+          message: data,
+        },
+        { onCloseKey: 'onCancel', openKey: 'open' },
+      );
+    });
 
     const defaultActions = useAssistantActions({
       data,
       id,
       index,
-      onOpenShareModal: () => setShareModal(true),
+      onOpenShareModal: handleOpenShareModal,
     });
 
     const hasTools = !!tools;
@@ -99,8 +129,6 @@ export const AssistantActionsBar = memo<AssistantActionsBarProps>(
         defaultActions.edit,
         defaultActions.copy,
         collapseAction,
-        defaultActions.divider,
-
         defaultActions.divider,
         defaultActions.share,
         defaultActions.divider,
@@ -159,16 +187,7 @@ export const AssistantActionsBar = memo<AssistantActionsBarProps>(
 
     if (error) return <ErrorActionsBar actions={defaultActions} onActionClick={handleAction} />;
 
-    return (
-      <>
-        <ActionIconGroup items={items} menu={{ items: menu }} onActionClick={handleAction} />
-        <ShareMessageModal
-          message={data}
-          onCancel={() => setShareModal(false)}
-          open={showShareModal}
-        />
-      </>
-    );
+    return <ActionIconGroup items={items} menu={menu} onActionClick={handleAction} />;
   },
 );
 

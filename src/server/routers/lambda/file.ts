@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { businessFileUploadCheck } from '@/business/server/lambda-routers/file';
 import { checkFileStorageUsage } from '@/business/server/trpc-middlewares/lambda';
 import { serverDBEnv } from '@/config/db';
 import { AsyncTaskModel } from '@/database/models/asyncTask';
@@ -13,7 +14,8 @@ import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { FileService } from '@/server/services/file';
 import { AsyncTaskStatus, AsyncTaskType } from '@/types/asyncTask';
-import { type FileListItem, QueryFileListSchema, UploadFileSchema } from '@/types/files';
+import { type FileListItem } from '@/types/files';
+import { QueryFileListSchema, UploadFileSchema } from '@/types/files';
 
 /**
  * Generate file proxy URL
@@ -64,6 +66,28 @@ export const fileRouter = router({
         }
       }
 
+      let actualSize = input.size;
+      try {
+        const { contentLength } = await ctx.fileService.getFileMetadata(input.url);
+        if (contentLength >= 1) {
+          actualSize = contentLength;
+        }
+      } catch {
+        // If metadata fetch fails, use original size from input
+      }
+
+      await businessFileUploadCheck({
+        actualSize,
+        clientIp: ctx.clientIp ?? undefined,
+        inputSize: input.size,
+        url: input.url,
+        userId: ctx.userId,
+      });
+
+      if (actualSize < 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'File size cannot be negative' });
+      }
+
       const { id } = await ctx.fileModel.create(
         {
           fileHash: input.hash,
@@ -72,7 +96,7 @@ export const fileRouter = router({
           metadata: input.metadata,
           name: input.name,
           parentId: resolvedParentId,
-          size: input.size,
+          size: actualSize,
           url: input.url,
         },
         // if the file is not exist in global file, create a new one
@@ -353,7 +377,7 @@ export const fileRouter = router({
 
     if (!file) return;
 
-    // delele the file from remove from S3 if it is not used by other files
+    // delete the file from S3 if it is not used by other files
     await ctx.fileService.deleteFile(file.url!);
   }),
 

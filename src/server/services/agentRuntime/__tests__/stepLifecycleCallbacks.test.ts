@@ -1,4 +1,4 @@
-import { AgentRuntimeContext, AgentState } from '@lobechat/agent-runtime';
+import { type AgentRuntimeContext } from '@lobechat/agent-runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -7,7 +7,7 @@ import {
 } from '@/server/modules/AgentRuntime';
 
 import { AgentRuntimeService } from '../AgentRuntimeService';
-import type { StepCompletionReason, StepLifecycleCallbacks } from '../types';
+import { type StepCompletionReason, type StepLifecycleCallbacks } from '../types';
 
 // Mock database models
 vi.mock('@/database/models/message', () => ({
@@ -25,7 +25,7 @@ vi.mock('@/server/modules/ModelRuntime', () => ({
     getApiKey: vi.fn(),
   })),
   initializeRuntimeOptions: vi.fn(),
-  initModelRuntimeWithUserPayload: vi.fn().mockReturnValue({
+  initModelRuntimeFromDB: vi.fn().mockResolvedValue({
     chat: vi.fn(),
   }),
 }));

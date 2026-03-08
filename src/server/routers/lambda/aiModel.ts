@@ -1,6 +1,6 @@
+import { type AiProviderModelListItem } from 'model-bank';
 import {
   AiModelTypeSchema,
-  type AiProviderModelListItem,
   CreateAiModelSchema,
   ToggleAiModelEnableSchema,
   UpdateAiModelSchema,
@@ -52,7 +52,7 @@ export const aiModelRouter = router({
     .input(
       z.object({
         id: z.string(),
-        // TODO: 补齐校验 Schema
+        // TODO: Complete validation schema
         models: z.array(z.any()),
       }),
     )

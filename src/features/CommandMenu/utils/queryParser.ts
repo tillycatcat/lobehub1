@@ -16,10 +16,13 @@ const VALID_TYPES = [
   'topic',
   'message',
   'file',
+  'folder',
   'page',
+  'memory',
   'mcp',
   'plugin',
   'communityAgent',
+  'knowledgeBase',
 ] as const;
 
 export type ValidSearchType = (typeof VALID_TYPES)[number];

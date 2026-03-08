@@ -1,13 +1,20 @@
-import { AgentRuntimeErrorType, type ILobeAgentRuntimeErrorType } from '@lobechat/model-runtime';
-import { ChatErrorType, type ChatMessageError, type ErrorType } from '@lobechat/types';
+import { ENABLE_BUSINESS_FEATURES } from '@lobechat/business-const';
+import { type ILobeAgentRuntimeErrorType } from '@lobechat/model-runtime';
+import { AgentRuntimeErrorType } from '@lobechat/model-runtime';
+import { type ChatMessageError, type ErrorType } from '@lobechat/types';
+import { ChatErrorType } from '@lobechat/types';
 import { type IPluginErrorType } from '@lobehub/chat-plugin-sdk';
-import { type AlertProps, Block, Highlighter, Skeleton } from '@lobehub/ui';
-import dynamic from 'next/dynamic';
+import { type AlertProps } from '@lobehub/ui';
+import { Block, Highlighter, Skeleton } from '@lobehub/ui';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import useBusinessErrorAlertConfig from '@/business/client/hooks/useBusinessErrorAlertConfig';
+import useBusinessErrorContent from '@/business/client/hooks/useBusinessErrorContent';
+import useRenderBusinessChatErrorMessageExtra from '@/business/client/hooks/useRenderBusinessChatErrorMessageExtra';
 import ErrorContent from '@/features/Conversation/ChatItem/components/ErrorContent';
 import { useProviderName } from '@/hooks/useProviderName';
+import dynamic from '@/libs/next/dynamic';
 
 import ChatInvalidAPIKey from './ChatInvalidApiKey';
 
@@ -20,12 +27,12 @@ const loading = () => (
   <Block
     align={'center'}
     padding={16}
+    variant={'outlined'}
     style={{
       overflow: 'hidden',
       position: 'relative',
       width: '100%',
     }}
-    variant={'outlined'}
   >
     <Skeleton.Button active block />
   </Block>
@@ -83,18 +90,26 @@ const getErrorAlertConfig = (
 export const useErrorContent = (error: any) => {
   const { t } = useTranslation('error');
   const providerName = useProviderName(error?.body?.provider || '');
+  const businessAlertConfig = useBusinessErrorAlertConfig(error?.type);
+  const { errorType: businessErrorType, hideMessage } = useBusinessErrorContent(error?.type);
 
   return useMemo<AlertProps | undefined>(() => {
     if (!error) return;
     const messageError = error;
 
-    const alertConfig = getErrorAlertConfig(messageError.type);
+    // Use business alert config if provided, otherwise fall back to default
+    const alertConfig = businessAlertConfig ?? getErrorAlertConfig(messageError.type);
+
+    // Use business error type if provided, otherwise use original
+    const finalErrorType = businessErrorType ?? messageError.type;
 
     return {
-      message: t(`response.${messageError.type}` as any, { provider: providerName }),
+      message: hideMessage
+        ? undefined
+        : t(`response.${finalErrorType}` as any, { provider: providerName }),
       ...alertConfig,
     };
-  }, [error]);
+  }, [businessAlertConfig, businessErrorType, error, hideMessage, providerName, t]);
 };
 
 interface ErrorExtraProps {
@@ -103,7 +118,11 @@ interface ErrorExtraProps {
 }
 
 const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data }) => {
-  const error = data.error as ChatMessageError;
+  const error = data.error;
+  const businessChatErrorMessageExtra = useRenderBusinessChatErrorMessageExtra(error, data.id);
+  if (ENABLE_BUSINESS_FEATURES && businessChatErrorMessageExtra)
+    return businessChatErrorMessageExtra;
+
   if (!error?.type) return;
 
   switch (error.type) {
@@ -132,6 +151,7 @@ const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data }) =>
 
   return (
     <ErrorContent
+      id={data.id}
       error={{
         ...alertError,
         extra: data.error?.body ? (
@@ -145,7 +165,6 @@ const ErrorMessageExtra = memo<ErrorExtraProps>(({ error: alertError, data }) =>
           </Highlighter>
         ) : undefined,
       }}
-      id={data.id}
     />
   );
 });

@@ -1,6 +1,5 @@
 import {
   type AssistantContentBlock,
-  ChatErrorType,
   type ChatImageItem,
   type ChatMessageError,
   type ChatMessagePluginError,
@@ -14,13 +13,14 @@ import {
   type ModelReasoning,
   type UpdateMessageRAGParams,
 } from '@lobechat/types';
+import { ChatErrorType } from '@lobechat/types';
 import { merge, nanoid, safeParseJSON } from '@lobechat/utils';
 import isEqual from 'fast-deep-equal';
-import type { StateCreator } from 'zustand';
+import { type StateCreator } from 'zustand';
 
 import { messageService } from '@/services/message';
 
-import type { Store as ConversationStore } from '../../../action';
+import { type Store as ConversationStore } from '../../../action';
 import { dataSelectors } from '../../data/selectors';
 
 /**
@@ -298,8 +298,8 @@ export const messageCRUDSlice: StateCreator<
 
     let ids = [message.id];
 
-    // Handle assistantGroup messages: delete all child blocks and tool results
-    if (message.role === 'assistantGroup' && message.children) {
+    // Handle assistantGroup and supervisor messages: delete all child blocks and tool results
+    if ((message.role === 'assistantGroup' || message.role === 'supervisor') && message.children) {
       const childIds = message.children.map((child: AssistantContentBlock) => child.id);
       ids = ids.concat(childIds);
 

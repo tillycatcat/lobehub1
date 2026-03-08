@@ -1,10 +1,17 @@
 import { type UIChatMessage } from '@lobechat/types';
-import { ActionIconGroup } from '@lobehub/ui';
 import type { ActionIconGroupEvent, ActionIconGroupItemType } from '@lobehub/ui';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { ActionIconGroup, createRawModal, Flexbox } from '@lobehub/ui';
+import { memo, useCallback, useMemo } from 'react';
 
-import ShareMessageModal from '../../../components/ShareMessageModal';
-import { messageStateSelectors, useConversationStore } from '../../../store';
+import { ReactionPicker } from '../../../components/Reaction';
+import ShareMessageModal, { type ShareModalProps } from '../../../components/ShareMessageModal';
+import {
+  createStore,
+  messageStateSelectors,
+  Provider,
+  useConversationStore,
+  useConversationStoreApi,
+} from '../../../store';
 import type {
   MessageActionItem,
   MessageActionItemOrDivider,
@@ -16,16 +23,20 @@ import { useAssistantActions } from './useAssistantActions';
 // Helper to strip handleClick from action items before passing to ActionIconGroup
 const stripHandleClick = (item: MessageActionItemOrDivider): ActionIconGroupItemType => {
   if ('type' in item && item.type === 'divider') return item as unknown as ActionIconGroupItemType;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { handleClick, children, ...rest } = item as MessageActionItem;
+  const { children, ...rest } = item as MessageActionItem;
+  const baseItem = { ...rest } as MessageActionItem;
+  delete (baseItem as { handleClick?: unknown }).handleClick;
   if (children) {
     return {
-      ...rest,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      children: children.map(({ handleClick: _, ...child }) => child),
+      ...baseItem,
+      children: children.map((child) => {
+        const nextChild = { ...child } as MessageActionItem;
+        delete (nextChild as { handleClick?: unknown }).handleClick;
+        return nextChild;
+      }),
     } as ActionIconGroupItemType;
   }
-  return rest as ActionIconGroupItemType;
+  return baseItem as ActionIconGroupItemType;
 };
 
 // Build action items map for handleAction lookup
@@ -57,7 +68,30 @@ interface AssistantActionsBarProps {
 export const AssistantActionsBar = memo<AssistantActionsBarProps>(
   ({ actionsConfig, id, data, index }) => {
     const { error, tools } = data;
-    const [showShareModal, setShareModal] = useState(false);
+    const store = useConversationStoreApi();
+
+    const handleOpenShareModal = useCallback(() => {
+      createRawModal(
+        (props: ShareModalProps) => (
+          <Provider
+            createStore={() => {
+              const state = store.getState();
+              return createStore({
+                context: state.context,
+                hooks: state.hooks,
+                skipFetch: state.skipFetch,
+              });
+            }}
+          >
+            <ShareMessageModal {...props} />
+          </Provider>
+        ),
+        {
+          message: data,
+        },
+        { onCloseKey: 'onCancel', openKey: 'open' },
+      );
+    }, [data, store]);
 
     const isCollapsed = useConversationStore(messageStateSelectors.isMessageCollapsed(id));
 
@@ -65,7 +99,7 @@ export const AssistantActionsBar = memo<AssistantActionsBarProps>(
       data,
       id,
       index,
-      onOpenShareModal: () => setShareModal(true),
+      onOpenShareModal: handleOpenShareModal,
     });
 
     const hasTools = !!tools;
@@ -174,16 +208,13 @@ export const AssistantActionsBar = memo<AssistantActionsBarProps>(
       [allActions],
     );
 
-    const shareOnCancel = useCallback(() => {
-      setShareModal(false);
-    }, []);
     if (error) return <ErrorActionsBar actions={defaultActions} onActionClick={handleAction} />;
 
     return (
-      <>
-        <ActionIconGroup items={items} menu={{ items: menu }} onActionClick={handleAction} />
-        <ShareMessageModal message={data} onCancel={shareOnCancel} open={showShareModal} />
-      </>
+      <Flexbox horizontal align={'center'} gap={8}>
+        <ReactionPicker messageId={id} />
+        <ActionIconGroup items={items} menu={menu} onActionClick={handleAction} />
+      </Flexbox>
     );
   },
 );

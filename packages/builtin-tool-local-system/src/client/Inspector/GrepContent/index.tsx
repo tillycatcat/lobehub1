@@ -1,30 +1,15 @@
 'use client';
 
-import { type GrepContentParams } from '@lobechat/electron-client-ipc';
-import { type BuiltinInspectorProps } from '@lobechat/types';
-import { createStaticStyles, cssVar, cx } from 'antd-style';
-import { Check, X } from 'lucide-react';
+import type { GrepContentParams } from '@lobechat/electron-client-ipc';
+import type { BuiltinInspectorProps } from '@lobechat/types';
+import { Text } from '@lobehub/ui';
+import { cssVar, cx } from 'antd-style';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { highlightTextStyles, shinyTextStyles } from '@/styles';
+import { highlightTextStyles, inspectorTextStyles, shinyTextStyles } from '@/styles';
 
-import { type GrepContentState } from '../../..';
-
-const styles = createStaticStyles(({ css, cssVar }) => ({
-  root: css`
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-
-    color: ${cssVar.colorTextSecondary};
-  `,
-  statusIcon: css`
-    margin-block-end: -2px;
-    margin-inline-start: 4px;
-  `,
-}));
+import type { GrepContentState } from '../../..';
 
 export const GrepContentInspector = memo<
   BuiltinInspectorProps<GrepContentParams, GrepContentState>
@@ -37,35 +22,52 @@ export const GrepContentInspector = memo<
   if (isArgumentsStreaming) {
     if (!pattern)
       return (
-        <div className={cx(styles.root, shinyTextStyles.shinyText)}>
+        <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
           <span>{t('builtins.lobe-local-system.apiName.grepContent')}</span>
         </div>
       );
 
     return (
-      <div className={cx(styles.root, shinyTextStyles.shinyText)}>
+      <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
         <span>{t('builtins.lobe-local-system.apiName.grepContent')}: </span>
         <span className={highlightTextStyles.primary}>{pattern}</span>
       </div>
     );
   }
 
-  // Check if grep was successful
-  const isSuccess = pluginState?.result?.success;
+  // Check result count
+  const resultCount = pluginState?.result?.total_matches ?? 0;
+  const hasResults = resultCount > 0;
+  const engine = pluginState?.result?.engine;
 
   return (
-    <div className={cx(styles.root, isLoading && shinyTextStyles.shinyText)}>
-      <span style={{ marginInlineStart: 2 }}>
-        <span>{t('builtins.lobe-local-system.apiName.grepContent')}: </span>
-        {pattern && <span className={highlightTextStyles.primary}>{pattern}</span>}
-        {isLoading ? null : pluginState?.result ? (
-          isSuccess ? (
-            <Check className={styles.statusIcon} color={cssVar.colorSuccess} size={14} />
-          ) : (
-            <X className={styles.statusIcon} color={cssVar.colorError} size={14} />
-          )
-        ) : null}
-      </span>
+    <div className={cx(inspectorTextStyles.root, isLoading && shinyTextStyles.shinyText)}>
+      <span>{t('builtins.lobe-local-system.apiName.grepContent')}: </span>
+      {pattern && <span className={highlightTextStyles.primary}>{pattern}</span>}
+      {!isLoading &&
+        pluginState?.result &&
+        (hasResults ? (
+          <span style={{ marginInlineStart: 4 }}>({resultCount})</span>
+        ) : (
+          <Text
+            as={'span'}
+            color={cssVar.colorTextDescription}
+            fontSize={12}
+            style={{ marginInlineStart: 4 }}
+          >
+            ({t('builtins.lobe-local-system.inspector.noResults')})
+          </Text>
+        ))}
+      {!isLoading && engine && (
+        <Text
+          as={'span'}
+          color={cssVar.colorTextDescription}
+          fontSize={12}
+          style={{ marginInlineStart: 4 }}
+        >
+          [{engine}]
+        </Text>
+      )}
     </div>
   );
 });

@@ -10,12 +10,15 @@
  * 3. Replaces the deprecated pluginState passing pattern
  */
 
+/** Status of a todo item */
+export type StepContextTodoStatus = 'todo' | 'processing' | 'completed';
+
 /**
  * Todo item structure
  * Duplicated here to avoid circular dependency with builtin-tool-gtd
  */
 export interface StepContextTodoItem {
-  completed: boolean;
+  status: StepContextTodoStatus;
   text: string;
 }
 
@@ -78,6 +81,11 @@ export interface InitialPageEditorContext {
  * ```
  */
 export interface RuntimeStepContext {
+  /**
+   * Activated tool identifiers accumulated from lobe-tools messages
+   * Tools once activated remain active for the rest of the conversation
+   */
+  activatedToolIds?: string[];
   /**
    * Page Editor context for current step
    * Contains the latest XML structure fetched at each step

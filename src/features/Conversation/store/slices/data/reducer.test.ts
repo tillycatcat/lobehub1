@@ -1,7 +1,8 @@
-import { ChatToolPayload, UIChatMessage } from '@lobechat/types';
+import { type ChatToolPayload, type UIChatMessage } from '@lobechat/types';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { MessageDispatch, messagesReducer } from './reducer';
+import { type MessageDispatch } from './reducer';
+import { messagesReducer } from './reducer';
 
 describe('messagesReducer', () => {
   let initialState: UIChatMessage[];
@@ -14,7 +15,6 @@ describe('messagesReducer', () => {
         createdAt: 1629264000000,
         updatedAt: 1629264000000,
         role: 'user',
-        meta: {},
       },
       {
         id: 'message2',
@@ -22,7 +22,6 @@ describe('messagesReducer', () => {
         createdAt: 1629264001000,
         updatedAt: 1629264001000,
         role: 'assistant',
-        meta: {},
         tools: [
           { identifier: 'tool1', apiName: 'calculator', id: 'abc', type: 'default', arguments: '' },
         ],
@@ -93,7 +92,6 @@ describe('messagesReducer', () => {
           createdAt: 1629264000000,
           updatedAt: 1629264000000,
           role: 'user',
-          meta: {},
           extra: { abc: '1' },
         } as UIChatMessage,
       ];
@@ -230,7 +228,6 @@ describe('messagesReducer', () => {
           content: 'Tool content',
           createdAt: 1629264000000,
           updatedAt: 1629264000000,
-          meta: {},
           plugin: {
             identifier: 'tool1',
             apiName: 'calculator',
@@ -327,7 +324,6 @@ describe('messagesReducer', () => {
           content: '',
           createdAt: 1629264000000,
           updatedAt: 1629264000000,
-          meta: {},
         } as UIChatMessage,
       ];
 
@@ -501,7 +497,6 @@ describe('messagesReducer', () => {
       expect(newMsg?.role).toBe('user');
       expect(newMsg?.createdAt).toBeDefined();
       expect(newMsg?.updatedAt).toBeDefined();
-      expect(newMsg?.meta).toEqual({});
     });
   });
 
@@ -565,7 +560,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 1,
           updatedAt: 1,
-          meta: {},
           parentId: undefined,
         },
         {
@@ -574,7 +568,6 @@ describe('messagesReducer', () => {
           role: 'assistant',
           createdAt: 2,
           updatedAt: 2,
-          meta: {},
           parentId: 'A',
         },
         {
@@ -583,7 +576,6 @@ describe('messagesReducer', () => {
           role: 'tool',
           createdAt: 3,
           updatedAt: 3,
-          meta: {},
           parentId: 'B',
         },
         {
@@ -592,7 +584,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 4,
           updatedAt: 4,
-          meta: {},
           parentId: 'C',
         },
       ];
@@ -624,7 +615,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 1,
           updatedAt: 1,
-          meta: {},
           parentId: undefined,
         },
         {
@@ -633,7 +623,6 @@ describe('messagesReducer', () => {
           role: 'assistant',
           createdAt: 2,
           updatedAt: 2,
-          meta: {},
           parentId: 'A',
         },
         {
@@ -642,7 +631,6 @@ describe('messagesReducer', () => {
           role: 'tool',
           createdAt: 3,
           updatedAt: 3,
-          meta: {},
           parentId: 'B',
         },
         {
@@ -651,7 +639,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 4,
           updatedAt: 4,
-          meta: {},
           parentId: 'C',
         },
       ];
@@ -681,7 +668,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 1,
           updatedAt: 1,
-          meta: {},
           parentId: undefined,
         },
         {
@@ -690,7 +676,6 @@ describe('messagesReducer', () => {
           role: 'assistant',
           createdAt: 2,
           updatedAt: 2,
-          meta: {},
           parentId: 'A',
         },
         {
@@ -699,7 +684,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 3,
           updatedAt: 3,
-          meta: {},
           parentId: 'B',
         },
         {
@@ -708,7 +692,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 4,
           updatedAt: 4,
-          meta: {},
           parentId: undefined,
         },
         {
@@ -717,7 +700,6 @@ describe('messagesReducer', () => {
           role: 'assistant',
           createdAt: 5,
           updatedAt: 5,
-          meta: {},
           parentId: 'X',
         },
         {
@@ -726,7 +708,6 @@ describe('messagesReducer', () => {
           role: 'user',
           createdAt: 6,
           updatedAt: 6,
-          meta: {},
           parentId: 'Y',
         },
       ];
@@ -761,7 +742,6 @@ describe('messagesReducer', () => {
           createdAt: Date.now(),
           updatedAt: Date.now(),
           role: 'user',
-          meta: {},
         },
       ];
 

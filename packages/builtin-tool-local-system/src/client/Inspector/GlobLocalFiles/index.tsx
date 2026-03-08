@@ -1,25 +1,18 @@
 'use client';
 
-import { type GlobFilesParams } from '@lobechat/electron-client-ipc';
-import { type BuiltinInspectorProps } from '@lobechat/types';
+import type { GlobFilesParams } from '@lobechat/electron-client-ipc';
+import type { BuiltinInspectorProps } from '@lobechat/types';
+import { Text } from '@lobehub/ui';
 import { createStaticStyles, cssVar, cx } from 'antd-style';
 import { Check, X } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { highlightTextStyles, shinyTextStyles } from '@/styles';
+import { highlightTextStyles, inspectorTextStyles, shinyTextStyles } from '@/styles';
 
-import { type GlobFilesState } from '../../..';
+import type { GlobFilesState } from '../../..';
 
-const styles = createStaticStyles(({ css, cssVar }) => ({
-  root: css`
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-
-    color: ${cssVar.colorTextSecondary};
-  `,
+const styles = createStaticStyles(({ css }) => ({
   statusIcon: css`
     margin-block-end: -2px;
     margin-inline-start: 4px;
@@ -36,13 +29,13 @@ export const GlobLocalFilesInspector = memo<BuiltinInspectorProps<GlobFilesParam
     if (isArgumentsStreaming) {
       if (!pattern)
         return (
-          <div className={cx(styles.root, shinyTextStyles.shinyText)}>
+          <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
             <span>{t('builtins.lobe-local-system.apiName.globLocalFiles')}</span>
           </div>
         );
 
       return (
-        <div className={cx(styles.root, shinyTextStyles.shinyText)}>
+        <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
           <span>{t('builtins.lobe-local-system.apiName.globLocalFiles')}: </span>
           <span className={highlightTextStyles.primary}>{pattern}</span>
         </div>
@@ -51,9 +44,10 @@ export const GlobLocalFilesInspector = memo<BuiltinInspectorProps<GlobFilesParam
 
     // Check if glob was successful
     const isSuccess = pluginState?.result?.success;
+    const engine = pluginState?.result?.engine;
 
     return (
-      <div className={cx(styles.root, isLoading && shinyTextStyles.shinyText)}>
+      <div className={cx(inspectorTextStyles.root, isLoading && shinyTextStyles.shinyText)}>
         <span style={{ marginInlineStart: 2 }}>
           <span>{t('builtins.lobe-local-system.apiName.globLocalFiles')}: </span>
           {pattern && <span className={highlightTextStyles.primary}>{pattern}</span>}
@@ -64,6 +58,16 @@ export const GlobLocalFilesInspector = memo<BuiltinInspectorProps<GlobFilesParam
               <X className={styles.statusIcon} color={cssVar.colorError} size={14} />
             )
           ) : null}
+          {!isLoading && engine && (
+            <Text
+              as={'span'}
+              color={cssVar.colorTextDescription}
+              fontSize={12}
+              style={{ marginInlineStart: 4 }}
+            >
+              [{engine}]
+            </Text>
+          )}
         </span>
       </div>
     );

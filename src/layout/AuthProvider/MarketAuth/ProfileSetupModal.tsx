@@ -2,14 +2,15 @@
 
 import { SiGithub, SiX } from '@icons-pack/react-simple-icons';
 import { Center, Flexbox, Icon, Input, Modal, Text, TextArea, Tooltip } from '@lobehub/ui';
-import { App, Form, Upload, type UploadProps } from 'antd';
+import { type UploadProps } from 'antd';
+import { App, Form, Modal as AntModal, Upload } from 'antd';
 import { cssVar } from 'antd-style';
 import { CircleHelp, Globe, ImagePlus, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import EmojiPicker from '@/components/EmojiPicker';
-import { MARKET_ENDPOINTS } from '@/services/_url';
+import { lambdaClient } from '@/libs/trpc/client';
 import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { globalGeneralSelectors } from '@/store/global/selectors';
@@ -69,12 +70,12 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
     const [loading, setLoading] = useState(false);
     const locale = useGlobalStore(globalGeneralSelectors.currentLanguage);
 
-    // 检查是否是自动授权模式
+    // Check if it's in automatic authorization mode
     const enableMarketTrustedClient = useServerConfigStore(
       serverConfigSelectors.enableMarketTrustedClient,
     );
 
-    // 获取当前用户头像作为默认值
+    // Get the current user's avatar as the default value
     const currentUserAvatar = useUserStore(userProfileSelectors.userAvatar);
 
     // Avatar state
@@ -110,7 +111,7 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
         });
 
         // Reset avatar and banner
-        // 如果 userProfile 有 avatarUrl 就用它，否则用当前用户头像作为默认值
+        // Use avatarUrl from userProfile if available, otherwise use the current user's avatar as default
         setAvatarUrl(userProfile?.avatarUrl || currentUserAvatar || null);
         setBannerUrl(userProfile?.bannerUrl || null);
       }
@@ -184,8 +185,8 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
       setBannerUrl(null);
     }, []);
 
-    const handleSubmit = useCallback(async () => {
-      // 如果不是自动授权模式，需要校验 accessToken
+    const doSubmit = useCallback(async () => {
+      // If not in automatic authorization mode, need to validate accessToken
       if (!enableMarketTrustedClient && !accessToken) {
         message.error(t('profileSetup.errors.notAuthenticated'));
         return;
@@ -211,37 +212,42 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
         if (bannerUrl) meta.bannerUrl = bannerUrl;
         if (Object.keys(socialLinks).length > 0) meta.socialLinks = socialLinks;
 
-        const response = await fetch(MARKET_ENDPOINTS.updateUserProfile, {
-          body: JSON.stringify({
-            avatarUrl: avatarUrl || undefined,
-            displayName: values.displayName,
-            meta: Object.keys(meta).length > 0 ? meta : undefined,
-            userName: values.userName,
-          }),
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          method: 'PUT',
+        const result = await lambdaClient.market.user.updateUserProfile.mutate({
+          avatarUrl: avatarUrl || undefined,
+          displayName: values.displayName,
+          meta: Object.keys(meta).length > 0 ? meta : undefined,
+          userName: values.userName,
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          if (errorData.error === 'username_taken') {
-            message.error(t('profileSetup.errors.usernameTaken'));
-            return;
-          }
-          throw new Error(errorData.message || 'Update failed');
-        }
-
-        const data = await response.json();
         message.success(t('profileSetup.success'));
-        onSuccess?.(data.user);
+        // Cast result.user to MarketUserProfile with required fields
+        const userProfile: MarketUserProfile = {
+          avatarUrl: result.user?.avatarUrl || avatarUrl || null,
+          bannerUrl: bannerUrl || null,
+          createdAt: result.user?.createdAt || new Date().toISOString(),
+          description: values.description || null,
+          displayName: values.displayName || null,
+          id: result.user?.id || 0,
+          namespace: result.user?.namespace || '',
+          socialLinks: Object.keys(socialLinks).length > 0 ? socialLinks : null,
+          type: result.user?.type || null,
+          userName: values.userName || null,
+        };
+        onSuccess?.(userProfile);
         onClose();
       } catch (error) {
         console.error('[ProfileSetupModal] Update failed:', error);
         if (error instanceof Error && error.message !== 'Validation failed') {
-          message.error(t('profileSetup.errors.updateFailed'));
+          // Check for username taken error (tRPC CONFLICT code)
+          const errorMessage = error.message || '';
+          if (
+            errorMessage.toLowerCase().includes('already taken') ||
+            errorMessage.includes('CONFLICT')
+          ) {
+            message.error(t('profileSetup.errors.usernameTaken'));
+          } else {
+            message.error(t('profileSetup.errors.updateFailed'));
+          }
         }
       } finally {
         setLoading(false);
@@ -258,6 +264,33 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
       t,
     ]);
 
+    const handleSubmit = useCallback(async () => {
+      try {
+        const values = await form.validateFields();
+        const oldUserName = userProfile?.userName;
+
+        // If userName changed and it's not first-time setup, show confirmation
+        if (!isFirstTimeSetup && oldUserName && values.userName !== oldUserName) {
+          AntModal.confirm({
+            cancelText: t('profileSetup.confirmChangeUserId.cancel'),
+            content: t('profileSetup.confirmChangeUserId.description', {
+              newId: values.userName,
+              oldId: oldUserName,
+            }),
+            okButtonProps: { danger: true },
+            okText: t('profileSetup.confirmChangeUserId.confirm'),
+            title: t('profileSetup.confirmChangeUserId.title'),
+            onOk: doSubmit,
+          });
+          return;
+        }
+
+        await doSubmit();
+      } catch {
+        // validateFields failed, form will show errors
+      }
+    }, [doSubmit, form, isFirstTimeSetup, t, userProfile?.userName]);
+
     const handleCancel = useCallback(() => {
       if (!isFirstTimeSetup) {
         onClose();
@@ -266,21 +299,21 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
 
     return (
       <Modal
+        centered
         cancelButtonProps={isFirstTimeSetup ? { style: { display: 'none' } } : undefined}
         cancelText={t('profileSetup.cancel')}
-        centered
         closable={!isFirstTimeSetup}
         confirmLoading={loading}
         keyboard={!isFirstTimeSetup}
         maskClosable={!isFirstTimeSetup}
         okText={isFirstTimeSetup ? t('profileSetup.getStarted') : t('profileSetup.save')}
-        onCancel={handleCancel}
-        onOk={handleSubmit}
         open={open}
         title={false}
         width={640}
+        onCancel={handleCancel}
+        onOk={handleSubmit}
       >
-        <Text fontSize={20} strong style={{ marginTop: 16 }}>
+        <Text strong fontSize={20} style={{ marginTop: 16 }}>
           {isFirstTimeSetup ? t('profileSetup.titleFirstTime') : t('profileSetup.titleEdit')}
         </Text>
         <Text style={{ display: 'block', marginBottom: 24 }} type="secondary">
@@ -290,7 +323,7 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
         </Text>
 
         <Form form={form} layout="vertical">
-          <Flexbox gap={24} horizontal>
+          <Flexbox horizontal gap={24}>
             <Flexbox flex={1}>
               <Form.Item
                 label={t('profileSetup.fields.displayName.label')}
@@ -304,21 +337,21 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
                 ]}
               >
                 <Input
+                  showCount
                   maxLength={50}
                   placeholder={t('profileSetup.fields.displayName.placeholder')}
-                  showCount
                 />
               </Form.Item>
               <Form.Item
+                name="userName"
                 label={
-                  <Flexbox align="center" gap={4} horizontal>
+                  <Flexbox horizontal align="center" gap={4}>
                     {t('profileSetup.fields.userName.label')}
                     <Tooltip title={t('profileSetup.fields.userName.tooltip')}>
                       <CircleHelp size={14} style={{ cursor: 'help', opacity: 0.5 }} />
                     </Tooltip>
                   </Flexbox>
                 }
-                name="userName"
                 rules={[
                   { message: t('profileSetup.fields.userName.required'), required: true },
                   {
@@ -336,10 +369,10 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
                 ]}
               >
                 <Input
+                  showCount
                   maxLength={32}
                   placeholder={t('profileSetup.fields.userName.placeholder')}
                   prefix="@"
-                  showCount
                 />
               </Form.Item>
             </Flexbox>
@@ -347,17 +380,17 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
             <Form.Item>
               <EmojiPicker
                 allowDelete={!!avatarUrl}
-                allowUpload={{
-                  enableEmoji: false,
-                }}
                 loading={avatarUploading}
                 locale={locale}
-                onChange={handleAvatarChange}
-                onDelete={handleAvatarDelete}
-                onUpload={handleAvatarUpload}
                 shape="square"
                 size={80}
                 value={avatarUrl || undefined}
+                allowUpload={{
+                  enableEmoji: false,
+                }}
+                onChange={handleAvatarChange}
+                onDelete={handleAvatarDelete}
+                onUpload={handleAvatarUpload}
               />
             </Form.Item>
           </Flexbox>
@@ -372,10 +405,10 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
             ]}
           >
             <TextArea
+              showCount
               maxLength={200}
               placeholder={t('profileSetup.fields.description.placeholder')}
               rows={3}
-              showCount
             />
           </Form.Item>
 
@@ -385,7 +418,7 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
               {/* Banner Upload Section */}
               <Form.Item
                 label={
-                  <Flexbox align="center" gap={4} horizontal>
+                  <Flexbox horizontal align="center" gap={4}>
                     {t('profileSetup.fields.bannerUrl.label')}
                     <Tooltip title={t('profileSetup.fields.bannerUrl.tooltip')}>
                       <CircleHelp size={14} style={{ cursor: 'help', opacity: 0.5 }} />
@@ -416,18 +449,18 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
                       }}
                     >
                       <Center
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (bannerUrl) e.currentTarget.style.opacity = '0';
-                        }}
                         style={{
                           background: bannerUrl ? 'rgba(0,0,0,0.4)' : 'transparent',
                           height: '100%',
                           opacity: bannerUrl ? 0 : 1,
                           transition: 'opacity 0.2s',
                           width: '100%',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (bannerUrl) e.currentTarget.style.opacity = '0';
                         }}
                       >
                         <Flexbox align="center" gap={8}>
@@ -450,19 +483,19 @@ const ProfileSetupModal = memo<ProfileSetupModalProps>(
                     </div>
                   </Upload>
                   {bannerUrl && (
-                    <Flexbox align="center" gap={8} horizontal justify="flex-end">
+                    <Flexbox horizontal align="center" gap={8} justify="flex-end">
                       <Text
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBannerDelete();
-                        }}
                         style={{
                           color: cssVar.colorError,
                           cursor: 'pointer',
                           fontSize: 12,
                         }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBannerDelete();
+                        }}
                       >
-                        <Flexbox align="center" gap={4} horizontal>
+                        <Flexbox horizontal align="center" gap={4}>
                           <Trash2 size={12} />
                           {t('profileSetup.fields.bannerUrl.remove')}
                         </Flexbox>

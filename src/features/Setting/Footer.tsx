@@ -4,8 +4,8 @@ import { BRANDING_NAME } from '@lobechat/business-const';
 import { Center, Flexbox, Icon } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
 import { MessageSquareHeart } from 'lucide-react';
-import Link from 'next/link';
-import { type PropsWithChildren, memo, useState } from 'react';
+import { type PropsWithChildren } from 'react';
+import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import GuideModal from '@/components/GuideModal';
@@ -34,16 +34,16 @@ const Footer = memo<PropsWithChildren>(() => {
     <>
       <Flexbox className={LayoutSettingsFooterClassName} justify={'flex-end'}>
         <Center
+          horizontal
           as={'footer'}
           className={styles}
           flex={'none'}
-          horizontal
           padding={16}
           width={'100%'}
         >
           <div style={{ textAlign: 'center' }}>
             <Icon icon={MessageSquareHeart} /> {`${t('footer.title')} `}
-            <Link
+            <a
               aria-label={'star'}
               href={GITHUB}
               onClick={(e) => {
@@ -52,9 +52,9 @@ const Footer = memo<PropsWithChildren>(() => {
               }}
             >
               {t('footer.action.star')}
-            </Link>
+            </a>
             {` ${t('footer.and')} `}
-            <Link
+            <a
               aria-label={'feedback'}
               href={GITHUB_ISSUES}
               onClick={(e) => {
@@ -63,13 +63,17 @@ const Footer = memo<PropsWithChildren>(() => {
               }}
             >
               {t('footer.action.feedback')}
-            </Link>
+            </a>
             {' !'}
           </div>
         </Center>
       </Flexbox>
       <GuideModal
         cancelText={t('footer.later')}
+        desc={t('footer.star.desc')}
+        okText={t('footer.star.action')}
+        open={openStar}
+        title={t('footer.star.title')}
         cover={
           <GuideVideo
             height={269}
@@ -77,18 +81,18 @@ const Footer = memo<PropsWithChildren>(() => {
             width={358}
           />
         }
-        desc={t('footer.star.desc')}
-        okText={t('footer.star.action')}
         onCancel={() => setOpenStar(false)}
         onOk={() => {
           if (isOnServerSide) return;
           window.open(GITHUB, '__blank');
         }}
-        open={openStar}
-        title={t('footer.star.title')}
       />
       <GuideModal
         cancelText={t('footer.later')}
+        desc={t('footer.feedback.desc', { appName: BRANDING_NAME })}
+        okText={t('footer.feedback.action')}
+        open={openFeedback}
+        title={t('footer.feedback.title')}
         cover={
           <GuideVideo
             height={269}
@@ -96,15 +100,11 @@ const Footer = memo<PropsWithChildren>(() => {
             width={358}
           />
         }
-        desc={t('footer.feedback.desc', { appName: BRANDING_NAME })}
-        okText={t('footer.feedback.action')}
         onCancel={() => setOpenFeedback(false)}
         onOk={() => {
           if (isOnServerSide) return;
           window.open(GITHUB_ISSUES, '__blank');
         }}
-        open={openFeedback}
-        title={t('footer.feedback.title')}
       />
     </>
   );

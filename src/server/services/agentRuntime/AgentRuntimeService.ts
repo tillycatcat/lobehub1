@@ -1,24 +1,18 @@
-import {
-  AgentRuntime,
-  type AgentRuntimeContext,
-  type AgentState,
-  GeneralChatAgent,
-} from '@lobechat/agent-runtime';
+import type { AgentRuntimeContext, AgentState } from '@lobechat/agent-runtime';
+import { AgentRuntime, GeneralChatAgent } from '@lobechat/agent-runtime';
+import { dynamicInterventionAudits } from '@lobechat/builtin-tools/dynamicInterventionAudits';
+import { AgentRuntimeErrorType, ChatErrorType, type ChatMessageError } from '@lobechat/types';
 import debug from 'debug';
 import urlJoin from 'url-join';
 
 import { MessageModel } from '@/database/models/message';
 import { type LobeChatDatabase } from '@/database/type';
-import {
-  AgentRuntimeCoordinator,
-  type AgentRuntimeCoordinatorOptions,
-  createStreamEventManager,
-} from '@/server/modules/AgentRuntime';
-import {
-  type RuntimeExecutorContext,
-  createRuntimeExecutors,
-} from '@/server/modules/AgentRuntime/RuntimeExecutors';
-import type { IStreamEventManager } from '@/server/modules/AgentRuntime/types';
+import { appEnv } from '@/envs/app';
+import { type AgentRuntimeCoordinatorOptions } from '@/server/modules/AgentRuntime';
+import { AgentRuntimeCoordinator, createStreamEventManager } from '@/server/modules/AgentRuntime';
+import { type RuntimeExecutorContext } from '@/server/modules/AgentRuntime/RuntimeExecutors';
+import { createRuntimeExecutors } from '@/server/modules/AgentRuntime/RuntimeExecutors';
+import { type IStreamEventManager } from '@/server/modules/AgentRuntime/types';
 import { mcpService } from '@/server/services/mcp';
 import { PluginGatewayService } from '@/server/services/pluginGateway';
 import { QueueService } from '@/server/services/queue';
@@ -26,53 +20,96 @@ import { LocalQueueServiceImpl } from '@/server/services/queue/impls';
 import { ToolExecutionService } from '@/server/services/toolExecution';
 import { BuiltinToolsExecutor } from '@/server/services/toolExecution/builtin';
 
-import type {
-  AgentExecutionParams,
-  AgentExecutionResult,
-  OperationCreationParams,
-  OperationCreationResult,
-  OperationStatusResult,
-  PendingInterventionsResult,
-  StartExecutionParams,
-  StartExecutionResult,
-  StepCompletionReason,
-  StepLifecycleCallbacks,
+import {
+  type AgentExecutionParams,
+  type AgentExecutionResult,
+  type OperationCreationParams,
+  type OperationCreationResult,
+  type OperationStatusResult,
+  type PendingInterventionsResult,
+  type StartExecutionParams,
+  type StartExecutionResult,
+  type StepCompletionReason,
+  type StepLifecycleCallbacks,
+  type StepPresentationData,
 } from './types';
+
+if (process.env.VERCEL) {
+  // eslint-disable-next-line no-console
+  debug.log = console.log.bind(console);
+}
 
 const log = debug('lobe-server:agent-runtime-service');
 
+/**
+ * Formats an error into ChatMessageError structure
+ * Handles various error formats from LLM execution and other sources
+ */
+function formatErrorForState(error: unknown): ChatMessageError {
+  // Handle ChatCompletionErrorPayload format from LLM errors
+  // e.g., { errorType: 'InvalidProviderAPIKey', error: { ... }, provider: 'openai' }
+  if (error && typeof error === 'object' && 'errorType' in error) {
+    const payload = error as {
+      error?: unknown;
+      errorType: ChatMessageError['type'];
+      message?: string;
+    };
+    return {
+      body: payload.error || error,
+      message: payload.message || String(payload.errorType),
+      type: payload.errorType,
+    };
+  }
+
+  // Handle standard Error objects
+  if (error instanceof Error) {
+    return {
+      body: { name: error.name },
+      message: error.message,
+      type: ChatErrorType.InternalServerError,
+    };
+  }
+
+  // Fallback for unknown error types
+  return {
+    body: error,
+    message: String(error),
+    type: AgentRuntimeErrorType.AgentRuntimeError,
+  };
+}
+
 export interface AgentRuntimeServiceOptions {
   /**
-   * Coordinator 配置选项
-   * 可以注入自定义的 stateManager 和 streamEventManager
+   * Coordinator configuration options
+   * Allows injection of custom stateManager and streamEventManager
    */
   coordinatorOptions?: AgentRuntimeCoordinatorOptions;
   /**
-   * 自定义 QueueService
-   * 设置为 null 时禁用队列调度（用于同步执行测试）
+   * Custom QueueService
+   * Set to null to disable queue scheduling (for synchronous execution tests)
    */
   queueService?: QueueService | null;
   /**
-   * 自定义 StreamEventManager
-   * 默认使用 Redis 实现的 StreamEventManager
-   * 测试环境可以传入 InMemoryStreamEventManager
+   * Custom StreamEventManager
+   * Defaults to Redis-based StreamEventManager
+   * Can pass InMemoryStreamEventManager in test environments
    */
   streamEventManager?: IStreamEventManager;
 }
 
 /**
  * Agent Runtime Service
- * 封装 Agent 执行相关的逻辑，提供统一的服务接口
+ * Encapsulates Agent execution logic and provides a unified service interface
  *
- * 支持依赖注入，可以使用内存实现进行测试：
+ * Supports dependency injection for testing with in-memory implementations:
  * ```ts
- * // 生产环境（默认使用 Redis）
+ * // Production environment (uses Redis by default)
  * const service = new AgentRuntimeService(db, userId);
  *
- * // 测试环境
+ * // Test environment
  * const service = new AgentRuntimeService(db, userId, {
  *   streamEventManager: new InMemoryStreamEventManager(),
- *   queueService: null, // 禁用队列，使用 executeSync
+ *   queueService: null, // Disable queue, use executeSync
  * });
  * ```
  */
@@ -82,16 +119,16 @@ export class AgentRuntimeService {
   private queueService: QueueService | null;
   private toolExecutionService: ToolExecutionService;
   /**
-   * Step 生命周期回调注册表
+   * Step lifecycle callback registry
    * key: operationId, value: callbacks
    */
   private stepCallbacks: Map<string, StepLifecycleCallbacks> = new Map();
   private get baseURL() {
-    const baseUrl =
-      process.env.AGENT_RUNTIME_BASE_URL || process.env.APP_URL || 'http://localhost:3010';
+    const baseUrl = process.env.AGENT_RUNTIME_BASE_URL || appEnv.APP_URL || 'http://localhost:3010';
 
     return urlJoin(baseUrl, '/api/agent');
   }
+  private serverDB: LobeChatDatabase;
   private userId: string;
   private messageModel: MessageModel;
 
@@ -107,12 +144,13 @@ export class AgentRuntimeService {
     });
     this.queueService =
       options?.queueService === null ? null : (options?.queueService ?? new QueueService());
+    this.serverDB = db;
     this.userId = userId;
     this.messageModel = new MessageModel(db, this.userId);
 
     // Initialize ToolExecutionService with dependencies
     const pluginGatewayService = new PluginGatewayService();
-    const builtinToolsExecutor = new BuiltinToolsExecutor();
+    const builtinToolsExecutor = new BuiltinToolsExecutor(db, userId);
 
     this.toolExecutionService = new ToolExecutionService({
       builtinToolsExecutor,
@@ -135,7 +173,7 @@ export class AgentRuntimeService {
     if (impl instanceof LocalQueueServiceImpl) {
       log('Setting up local execution callback');
       impl.setExecutionCallback(async (operationId, stepIndex, context) => {
-        log('[%s] Local callback executing step %d', operationId, stepIndex);
+        log('[%s][%d] Local callback executing...', operationId, stepIndex);
         await this.executeStep({
           context,
           operationId,
@@ -148,9 +186,9 @@ export class AgentRuntimeService {
   // ==================== Step Lifecycle Callbacks ====================
 
   /**
-   * 注册 step 生命周期回调
-   * @param operationId - 操作 ID
-   * @param callbacks - 回调函数集合
+   * Register step lifecycle callbacks
+   * @param operationId - Operation ID
+   * @param callbacks - Callback function collection
    */
   registerStepCallbacks(operationId: string, callbacks: StepLifecycleCallbacks): void {
     this.stepCallbacks.set(operationId, callbacks);
@@ -158,8 +196,8 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 移除 step 生命周期回调
-   * @param operationId - 操作 ID
+   * Remove step lifecycle callbacks
+   * @param operationId - Operation ID
    */
   unregisterStepCallbacks(operationId: string): void {
     this.stepCallbacks.delete(operationId);
@@ -167,17 +205,44 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 获取 step 生命周期回调
-   * @param operationId - 操作 ID
+   * Get step lifecycle callbacks
+   * @param operationId - Operation ID
    */
   getStepCallbacks(operationId: string): StepLifecycleCallbacks | undefined {
     return this.stepCallbacks.get(operationId);
   }
 
+  // ==================== Operation Interruption ====================
+
+  /**
+   * Interrupt a running agent operation by setting its state to 'interrupted'.
+   * The agent will stop at the next step boundary (cannot abort an in-flight LLM call).
+   * Works with both Redis and InMemory state managers via the coordinator abstraction.
+   *
+   * @returns true if the operation was interrupted, false if already in a terminal state or not found
+   */
+  async interruptOperation(operationId: string): Promise<boolean> {
+    const state = await this.coordinator.loadAgentState(operationId);
+    if (!state) return false;
+
+    if (state.status === 'done' || state.status === 'error' || state.status === 'interrupted') {
+      return false;
+    }
+
+    await this.coordinator.saveAgentState(operationId, {
+      ...state,
+      lastModified: new Date().toISOString(),
+      status: 'interrupted',
+    });
+
+    log('[%s] Operation interrupted', operationId);
+    return true;
+  }
+
   // ==================== Operation Management ====================
 
   /**
-   * 创建新的 Agent 操作
+   * Create a new Agent operation
    */
   async createOperation(params: OperationCreationParams): Promise<OperationCreationResult> {
     const {
@@ -187,51 +252,86 @@ export class AgentRuntimeService {
       modelRuntimeConfig,
       userId,
       autoStart = true,
+      stream,
       tools,
       initialMessages = [],
       appContext,
       toolManifestMap,
+      toolSourceMap,
       stepCallbacks,
+      userInterventionConfig,
+      completionWebhook,
+      stepWebhook,
+      webhookDelivery,
+      discordContext,
+      evalContext,
+      maxSteps,
+      userMemory,
     } = params;
 
     try {
-      log('[%s] Creating new operation (autoStart: %s)', operationId, autoStart);
+      const memories = userMemory?.memories;
+      log(
+        '[%s] Creating new operation (autoStart: %s) with params: model=%s, provider=%s, tools=%d, messages=%d, manifests=%d, memory=%s',
+        operationId,
+        autoStart,
+        agentConfig?.model,
+        agentConfig?.provider,
+        tools?.length ?? 0,
+        initialMessages.length,
+        toolManifestMap ? Object.keys(toolManifestMap).length : 0,
+        memories
+          ? `{contexts:${memories.contexts?.length ?? 0},experiences:${memories.experiences?.length ?? 0},preferences:${memories.preferences?.length ?? 0},identities:${memories.identities?.length ?? 0},activities:${memories.activities?.length ?? 0},persona:${memories.persona ? 'yes' : 'no'}}`
+          : 'none',
+      );
 
-      // 初始化操作状态 - 先创建状态再保存
+      // Initialize operation state - create state before saving
       const initialState = {
         createdAt: new Date().toISOString(),
         // Store initialContext for executeSync to use
         initialContext,
         lastModified: new Date().toISOString(),
-        // 使用传入的初始消息
+        // Use the passed initial messages
         messages: initialMessages,
         metadata: {
           agentConfig,
+          completionWebhook,
+          discordContext,
+          evalContext,
           // need be removed
           modelRuntimeConfig,
+          stepWebhook,
+          stream,
           userId,
+          userMemory,
+          webhookDelivery,
+          workingDirectory: agentConfig?.chatConfig?.localSystem?.workingDirectory,
           ...appContext,
         },
+        maxSteps,
         // modelRuntimeConfig at state level for executor fallback
         modelRuntimeConfig,
         operationId,
         status: 'idle',
         stepCount: 0,
         toolManifestMap,
+        toolSourceMap,
         tools,
+        // User intervention config for headless mode in async tasks
+        userInterventionConfig,
       } as Partial<AgentState>;
 
-      // 使用协调器创建操作，自动发送初始化事件
+      // Use coordinator to create operation, automatically sends initialization event
       await this.coordinator.createAgentOperation(operationId, {
         agentConfig,
         modelRuntimeConfig,
         userId,
       });
 
-      // 保存初始状态
+      // Save initial state
       await this.coordinator.saveAgentState(operationId, initialState as any);
 
-      // 注册 step 生命周期回调
+      // Register step lifecycle callbacks
       if (stepCallbacks) {
         this.registerStepCallbacks(operationId, stepCallbacks);
       }
@@ -245,7 +345,7 @@ export class AgentRuntimeService {
         // QStashQueueServiceImpl schedules HTTP requests
         messageId = await this.queueService.scheduleMessage({
           context: initialContext,
-          delay: 50, // 短延迟启动
+          delay: 50, // Short delay for startup
           endpoint: `${this.baseURL}/run`,
           operationId,
           priority: 'high',
@@ -267,36 +367,102 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 执行 Agent 步骤
+   * Execute Agent step
    */
   async executeStep(params: AgentExecutionParams): Promise<AgentExecutionResult> {
     const { operationId, stepIndex, context, humanInput, approvedToolCall, rejectionReason } =
       params;
 
-    // 获取已注册的回调
     const callbacks = this.getStepCallbacks(operationId);
 
-    try {
-      log('[%s] Executing step %d', operationId, stepIndex);
+    // ===== Distributed lock: prevent duplicate execution from QStash retries =====
+    const claimed = await this.coordinator.tryClaimStep(operationId, stepIndex, 35);
+    if (!claimed) {
+      log(
+        '[%s][%d] Step lock conflict — another instance is executing this step, returning locked',
+        operationId,
+        stepIndex,
+      );
+      return {
+        locked: true,
+        nextStepScheduled: false,
+        state: {},
+        success: false,
+      };
+    }
 
-      // 发布步骤开始事件
+    try {
+      log('[%s][%d] Start step executing...', operationId, stepIndex);
+
+      // Publish step start event
       await this.streamManager.publishStreamEvent(operationId, {
         data: {},
         stepIndex,
         type: 'step_start',
       });
 
-      // 获取操作状态和元数据
-      const [agentState, operationMetadata] = await Promise.all([
-        this.coordinator.loadAgentState(operationId),
-        this.coordinator.getOperationMetadata(operationId),
-      ]);
+      // Get operation state and metadata
+      const agentState = await this.coordinator.loadAgentState(operationId);
 
       if (!agentState) {
         throw new Error(`Agent state not found for operation ${operationId}`);
       }
 
-      // 调用 onBeforeStep 回调
+      // Layer 2 defense: catch extremely delayed retries that arrive after lock TTL expired
+      if (agentState.stepCount > stepIndex) {
+        log(
+          '[%s][%d] Step already completed (stepCount=%d), skipping',
+          operationId,
+          stepIndex,
+          agentState.stepCount,
+        );
+        return {
+          nextStepScheduled: false,
+          state: agentState,
+          stepResult: null,
+          success: true,
+        };
+      }
+
+      // Early exit: skip step if operation is already in a terminal state
+      // This prevents executing expensive LLM/tool calls after timeout or interruption
+      if (
+        agentState.status === 'interrupted' ||
+        agentState.status === 'done' ||
+        agentState.status === 'error'
+      ) {
+        log(
+          '[%s][%d] Skipping step — operation already in terminal state: %s',
+          operationId,
+          stepIndex,
+          agentState.status,
+        );
+
+        const reason = this.determineCompletionReason(agentState);
+
+        // Trigger completion callback so eval run can finalize properly
+        if (callbacks?.onComplete) {
+          try {
+            await callbacks.onComplete({
+              finalState: agentState,
+              operationId,
+              reason,
+            });
+            this.unregisterStepCallbacks(operationId);
+          } catch (callbackError) {
+            log('[%s] onComplete callback error: %O', operationId, callbackError);
+          }
+        }
+
+        return {
+          nextStepScheduled: false,
+          state: agentState,
+          stepResult: null,
+          success: true,
+        };
+      }
+
+      // Call onBeforeStep callback
       if (callbacks?.onBeforeStep) {
         try {
           await callbacks.onBeforeStep({
@@ -310,14 +476,16 @@ export class AgentRuntimeService {
         }
       }
 
-      // 创建 Agent 和 Runtime 实例
+      // Create Agent and Runtime instances
+      // Use agentState.metadata which contains the full app context (topicId, agentId, etc.)
+      // operationMetadata only contains basic fields (agentConfig, modelRuntimeConfig, userId)
       const { runtime } = await this.createAgentRuntime({
-        metadata: operationMetadata,
+        metadata: agentState?.metadata,
         operationId,
         stepIndex,
       });
 
-      // 处理人工干预
+      // Handle human intervention
       let currentContext = context;
       let currentState = agentState;
 
@@ -331,25 +499,34 @@ export class AgentRuntimeService {
         currentContext = interventionResult.nextContext;
       }
 
-      // 执行步骤
+      // Execute step
       const startAt = Date.now();
       const stepResult = await runtime.step(currentState, currentContext);
 
-      // 保存状态，协调器会自动处理事件发送
+      // Check if the operation was interrupted while the step was executing
+      // (e.g., user clicked abort during a long LLM call)
+      const latestState = await this.coordinator.loadAgentState(operationId);
+      if (latestState?.status === 'interrupted') {
+        stepResult.newState.status = 'interrupted';
+        stepResult.newState.lastModified = new Date().toISOString();
+        log('[%s][%d] Operation was interrupted during step execution', operationId, stepIndex);
+      }
+
+      // Save state, coordinator will handle event sending automatically
       await this.coordinator.saveStepResult(operationId, {
         ...stepResult,
         executionTime: Date.now() - startAt,
         stepIndex, // placeholder
       });
 
-      // 决定是否调度下一步
+      // Decide whether to schedule next step
       const shouldContinue = this.shouldContinueExecution(
         stepResult.newState,
         stepResult.nextContext,
       );
       let nextStepScheduled = false;
 
-      // 发布步骤完成事件
+      // Publish step complete event
       await this.streamManager.publishStreamEvent(operationId, {
         data: {
           finalState: stepResult.newState,
@@ -360,12 +537,173 @@ export class AgentRuntimeService {
         type: 'step_complete',
       });
 
-      log('[%s] Step %d completed', operationId, stepIndex);
+      // Build enhanced step completion log & presentation data
+      const { usage, cost } = stepResult.newState;
+      const phase = stepResult.nextContext?.phase;
+      const isToolPhase = phase === 'tool_result' || phase === 'tools_batch_result';
 
-      // 调用 onAfterStep 回调
+      // --- Extract presentation fields from step result ---
+      let content: string | undefined;
+      let reasoning: string | undefined;
+      let toolsCalling:
+        | Array<{ apiName: string; arguments?: string; identifier: string }>
+        | undefined;
+      let toolsResult:
+        | Array<{ apiName: string; identifier: string; isSuccess?: boolean; output?: string }>
+        | undefined;
+      let stepSummary: string;
+
+      if (phase === 'tool_result') {
+        const toolPayload = stepResult.nextContext?.payload as any;
+        const toolCall = toolPayload?.toolCall;
+        const identifier = toolCall?.identifier || 'unknown';
+        const apiName = toolCall?.apiName || 'unknown';
+        const output = toolPayload?.data;
+        toolsResult = [
+          {
+            apiName,
+            identifier,
+            isSuccess: toolPayload?.isSuccess !== false,
+            output:
+              typeof output === 'string'
+                ? output
+                : output != null
+                  ? JSON.stringify(output)
+                  : undefined,
+          },
+        ];
+        stepSummary = `[tool] ${identifier}/${apiName}`;
+      } else if (phase === 'tools_batch_result') {
+        const nextPayload = stepResult.nextContext?.payload as any;
+        const toolCount = nextPayload?.toolCount || 0;
+        const rawToolResults = nextPayload?.toolResults || [];
+        const mappedResults: Array<{
+          apiName: string;
+          identifier: string;
+          isSuccess?: boolean;
+          output?: string;
+        }> = rawToolResults.map((r: any) => {
+          const tc = r.toolCall;
+          const output = r.data;
+          return {
+            apiName: tc?.apiName || 'unknown',
+            identifier: tc?.identifier || 'unknown',
+            isSuccess: r?.isSuccess !== false,
+            output:
+              typeof output === 'string'
+                ? output
+                : output != null
+                  ? JSON.stringify(output)
+                  : undefined,
+          };
+        });
+        toolsResult = mappedResults;
+        const toolNames = mappedResults.map((r) => `${r.identifier}/${r.apiName}`);
+        stepSummary = `[tools×${toolCount}] ${toolNames.join(', ')}`;
+      } else {
+        // Check for done event first (finish step with no next context)
+        const doneEvent = stepResult.events?.find((e) => e.type === 'done') as
+          | { reason?: string; reasonDetail?: string; type: 'done' }
+          | undefined;
+
+        if (doneEvent) {
+          stepSummary = `[done] reason=${doneEvent.reason ?? 'unknown'}`;
+        } else {
+          // LLM result
+          const llmEvent = stepResult.events?.find((e) => e.type === 'llm_result');
+          content = (llmEvent as any)?.result?.content || undefined;
+          reasoning = (llmEvent as any)?.result?.reasoning || undefined;
+
+          // Use parsed ChatToolPayload from payload (has identifier + apiName)
+          const payloadToolsCalling = (stepResult.nextContext?.payload as any)?.toolsCalling as
+            | Array<{ apiName: string; arguments: string; identifier: string }>
+            | undefined;
+          const hasToolCalls = Array.isArray(payloadToolsCalling) && payloadToolsCalling.length > 0;
+
+          if (hasToolCalls) {
+            toolsCalling = payloadToolsCalling.map((tc) => ({
+              apiName: tc.apiName,
+              arguments: tc.arguments,
+              identifier: tc.identifier,
+            }));
+          }
+
+          const parts: string[] = [];
+          if (reasoning) {
+            const thinkPreview = reasoning.length > 30 ? reasoning.slice(0, 30) + '...' : reasoning;
+            parts.push(`💭 "${thinkPreview}"`);
+          }
+          if (!content && hasToolCalls) {
+            parts.push(
+              `→ call tools: ${toolsCalling!.map((tc) => `${tc.identifier}|${tc.apiName}`).join(', ')}`,
+            );
+          } else if (content) {
+            const preview = content.length > 20 ? content.slice(0, 20) + '...' : content;
+            parts.push(`"${preview}"`);
+          }
+          if (parts.length > 0) {
+            stepSummary = `[llm] ${parts.join(' | ')}`;
+          } else {
+            stepSummary = `[llm] (empty) phase=${stepResult.nextContext?.phase ?? 'none'} events=${stepResult.events?.length ?? 0}`;
+          }
+        }
+      }
+
+      // --- Step-level usage from nextContext.stepUsage ---
+      const stepUsage = stepResult.nextContext?.stepUsage as Record<string, number> | undefined;
+
+      // --- Cumulative usage ---
+      const tokens = usage?.llm?.tokens;
+      const totalInputTokens = tokens?.input ?? 0;
+      const totalOutputTokens = tokens?.output ?? 0;
+      const totalTokensNum = tokens?.total ?? 0;
+      const totalCostNum = cost?.total ?? 0;
+
+      const totalTokensStr =
+        totalTokensNum >= 1_000_000
+          ? `${(totalTokensNum / 1_000_000).toFixed(1)}m`
+          : totalTokensNum >= 1000
+            ? `${(totalTokensNum / 1000).toFixed(1)}k`
+            : String(totalTokensNum);
+      const llmCalls = usage?.llm?.apiCalls ?? 0;
+      const toolCallCount = usage?.tools?.totalCalls ?? 0;
+
+      log(
+        '[%s][%d] completed %s | total: %s tokens / $%s | llm×%d | tools×%d',
+        operationId,
+        stepIndex,
+        stepSummary,
+        totalTokensStr,
+        totalCostNum.toFixed(4),
+        llmCalls,
+        toolCallCount,
+      );
+
+      // Build presentation data object for callbacks and webhooks
+      const stepPresentationData: StepPresentationData = {
+        content,
+        executionTimeMs: Date.now() - startAt,
+        reasoning,
+        stepCost: stepUsage?.cost ?? undefined,
+        stepInputTokens: stepUsage?.totalInputTokens ?? undefined,
+        stepOutputTokens: stepUsage?.totalOutputTokens ?? undefined,
+        stepTotalTokens: stepUsage?.totalTokens ?? undefined,
+        stepType: isToolPhase ? ('call_tool' as const) : ('call_llm' as const),
+        thinking: !isToolPhase,
+        toolsCalling,
+        toolsResult,
+        totalCost: totalCostNum,
+        totalInputTokens,
+        totalOutputTokens,
+        totalSteps: stepResult.newState.stepCount ?? 0,
+        totalTokens: totalTokensNum,
+      };
+
+      // Call onAfterStep callback with presentation data
       if (callbacks?.onAfterStep) {
         try {
           await callbacks.onAfterStep({
+            ...stepPresentationData,
             operationId,
             shouldContinue,
             state: stepResult.newState,
@@ -375,6 +713,85 @@ export class AgentRuntimeService {
         } catch (callbackError) {
           log('[%s] onAfterStep callback error: %O', operationId, callbackError);
         }
+      }
+
+      // Dev mode: record step snapshot to disk for agent-tracing CLI
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          const { FileSnapshotStore } = await import('@lobechat/agent-tracing');
+          const store = new FileSnapshotStore();
+
+          const partial = (await store.loadPartial(operationId)) ?? { steps: [] };
+
+          if (!partial.startedAt) {
+            partial.startedAt = Date.now();
+            partial.model =
+              (agentState?.metadata as any)?.agentConfig?.model ??
+              agentState?.modelRuntimeConfig?.model;
+            partial.provider =
+              (agentState?.metadata as any)?.agentConfig?.provider ??
+              agentState?.modelRuntimeConfig?.provider;
+          }
+
+          if (!partial.steps) partial.steps = [];
+          partial.steps.push({
+            completedAt: Date.now(),
+            content: stepPresentationData.content,
+            context: {
+              payload: currentContext?.payload,
+              phase: currentContext?.phase ?? 'unknown',
+              stepContext: currentContext?.stepContext,
+            },
+            events: stepResult.events as any,
+            executionTimeMs: stepPresentationData.executionTimeMs,
+            inputTokens: stepPresentationData.stepInputTokens,
+            messages: agentState?.messages,
+            messagesAfter: stepResult.newState.messages,
+            outputTokens: stepPresentationData.stepOutputTokens,
+            reasoning: stepPresentationData.reasoning,
+            startedAt: startAt,
+            stepIndex,
+            stepType: stepPresentationData.stepType,
+            toolsCalling: stepPresentationData.toolsCalling,
+            toolsResult: stepPresentationData.toolsResult,
+            totalCost: stepPresentationData.totalCost,
+            totalTokens: stepPresentationData.totalTokens,
+          });
+
+          await store.savePartial(operationId, partial);
+        } catch {
+          // agent-tracing not available, skip silently
+        }
+      }
+
+      // Update step tracking in state metadata and trigger step webhook
+      if (stepResult.newState.metadata?.stepWebhook) {
+        const prevTracking = stepResult.newState.metadata._stepTracking || {};
+        const newTotalToolCalls = (prevTracking.totalToolCalls ?? 0) + (toolsCalling?.length ?? 0);
+
+        // Truncate content to 1800 chars to match Discord message limits
+        const truncatedContent = content
+          ? content.length > 1800
+            ? content.slice(0, 1800) + '...'
+            : content
+          : prevTracking.lastLLMContent;
+
+        const updatedTracking = {
+          lastLLMContent: truncatedContent,
+          lastToolsCalling: toolsCalling || prevTracking.lastToolsCalling,
+          totalToolCalls: newTotalToolCalls,
+        };
+
+        // Persist tracking state for next step
+        stepResult.newState.metadata._stepTracking = updatedTracking;
+        await this.coordinator.saveAgentState(operationId, stepResult.newState);
+
+        // Fire step webhook (include shouldContinue so the callback knows
+        // whether the agent is still running or about to complete)
+        await this.triggerStepWebhook(stepResult.newState, operationId, {
+          ...stepPresentationData,
+          shouldContinue,
+        } as unknown as Record<string, unknown>);
       }
 
       if (shouldContinue && stepResult.nextContext && this.queueService) {
@@ -392,22 +809,67 @@ export class AgentRuntimeService {
         });
         nextStepScheduled = true;
 
-        log('[%s] Scheduled next step %d', operationId, nextStepIndex);
+        log('[%s][%d] Scheduled next step %d', operationId, stepIndex, nextStepIndex);
       }
 
-      // 检查是否操作完成，调用 onComplete 回调
-      if (!shouldContinue && callbacks?.onComplete) {
+      // Check if operation is complete
+      if (!shouldContinue) {
         const reason = this.determineCompletionReason(stepResult.newState);
-        try {
-          await callbacks.onComplete({
-            finalState: stepResult.newState,
-            operationId,
-            reason,
-          });
-          // 操作完成后清理回调
-          this.unregisterStepCallbacks(operationId);
-        } catch (callbackError) {
-          log('[%s] onComplete callback error: %O', operationId, callbackError);
+
+        // Trigger completion webhook (fire-and-forget)
+        await this.triggerCompletionWebhook(stepResult.newState, operationId, reason);
+
+        // Call onComplete callback
+        if (callbacks?.onComplete) {
+          try {
+            await callbacks.onComplete({
+              finalState: stepResult.newState,
+              operationId,
+              reason,
+            });
+            // Clean up callbacks after operation completes
+            this.unregisterStepCallbacks(operationId);
+          } catch (callbackError) {
+            log('[%s] onComplete callback error: %O', operationId, callbackError);
+          }
+        }
+
+        // Dev mode: finalize tracing snapshot
+        if (process.env.NODE_ENV === 'development') {
+          try {
+            const { FileSnapshotStore } = await import('@lobechat/agent-tracing');
+            const store = new FileSnapshotStore();
+            const partial = await store.loadPartial(operationId);
+
+            if (partial) {
+              const snapshot = {
+                completedAt: Date.now(),
+                completionReason: reason,
+                error: stepResult.newState.error
+                  ? {
+                      message: String(
+                        stepResult.newState.error.message ?? stepResult.newState.error,
+                      ),
+                      type: String(stepResult.newState.error.type ?? 'unknown'),
+                    }
+                  : undefined,
+                model: partial.model,
+                operationId,
+                provider: partial.provider,
+                startedAt: partial.startedAt ?? Date.now(),
+                steps: (partial.steps ?? []).sort((a, b) => a.stepIndex - b.stepIndex),
+                totalCost: stepResult.newState.cost?.total ?? 0,
+                totalSteps: stepResult.newState.stepCount,
+                totalTokens: stepResult.newState.usage?.llm?.tokens?.total ?? 0,
+                traceId: operationId,
+              };
+
+              await store.save(snapshot as any);
+              await store.removePartial(operationId);
+            }
+          } catch {
+            // agent-tracing not available, skip silently
+          }
         }
       }
 
@@ -420,7 +882,7 @@ export class AgentRuntimeService {
     } catch (error) {
       log('Step %d failed for operation %s: %O', stepIndex, operationId, error);
 
-      // 发布错误事件
+      // Publish error event
       await this.streamManager.publishStreamEvent(operationId, {
         data: {
           error: (error as Error).message,
@@ -431,12 +893,25 @@ export class AgentRuntimeService {
         type: 'error',
       });
 
-      // 执行失败时也调用 onComplete 回调
+      // Build and save error state so it's persisted for later retrieval
+      const errorState = await this.coordinator.loadAgentState(operationId);
+      const finalStateWithError = {
+        ...errorState!,
+        error: formatErrorForState(error),
+        status: 'error' as const,
+      };
+
+      // Save the error state to coordinator so getOperationStatus can retrieve it
+      await this.coordinator.saveAgentState(operationId, finalStateWithError);
+
+      // Trigger completion webhook on error (fire-and-forget)
+      await this.triggerCompletionWebhook(finalStateWithError, operationId, 'error');
+
+      // Also call onComplete callback when execution fails
       if (callbacks?.onComplete) {
         try {
-          const errorState = await this.coordinator.loadAgentState(operationId);
           await callbacks.onComplete({
-            finalState: errorState!,
+            finalState: finalStateWithError,
             operationId,
             reason: 'error',
           });
@@ -447,11 +922,16 @@ export class AgentRuntimeService {
       }
 
       throw error;
+    } finally {
+      // Release lock so legitimate retries or next operations can proceed.
+      // If Vercel force-kills the process, this won't execute — the lock
+      // auto-expires after TTL (35s), allowing QStash retries to self-heal.
+      await this.coordinator.releaseStepLock(operationId, stepIndex);
     }
   }
 
   /**
-   * 获取操作状态
+   * Get operation status
    */
   async getOperationStatus(params: {
     historyLimit?: number;
@@ -463,19 +943,19 @@ export class AgentRuntimeService {
     try {
       log('Getting operation status for %s', operationId);
 
-      // 获取当前状态和元数据
+      // Get current state and metadata
       const [currentState, operationMetadata] = await Promise.all([
         this.coordinator.loadAgentState(operationId),
         this.coordinator.getOperationMetadata(operationId),
       ]);
 
-      // Operation 可能已过期或不存在，返回 null
+      // Operation may have expired or does not exist, return null
       if (!currentState || !operationMetadata) {
         log('Operation %s not found (may have expired)', operationId);
         return null;
       }
 
-      // 获取执行历史（如果需要）
+      // Get execution history (if needed)
       let executionHistory;
       if (includeHistory) {
         try {
@@ -486,7 +966,7 @@ export class AgentRuntimeService {
         }
       }
 
-      // 获取最近的流式事件（用于调试）
+      // Get recent stream events (for debugging)
       let recentEvents;
       if (includeHistory) {
         try {
@@ -497,7 +977,7 @@ export class AgentRuntimeService {
         }
       }
 
-      // 计算操作统计信息
+      // Calculate operation statistics
       const stats = {
         lastActiveTime: operationMetadata.lastActiveAt
           ? Date.now() - new Date(operationMetadata.lastActiveAt).getTime()
@@ -542,7 +1022,7 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 获取待处理的人工干预列表
+   * Get list of pending human interventions
    */
   async getPendingInterventions(params: {
     operationId?: string;
@@ -558,11 +1038,11 @@ export class AgentRuntimeService {
       if (operationId) {
         operations = [operationId];
       } else if (userId) {
-        // 获取用户的所有活跃操作
+        // Get all active operations for the user
         try {
           const activeOperations = await this.coordinator.getActiveOperations();
 
-          // 过滤出属于该用户的操作
+          // Filter operations belonging to this user
           const userOperations = [];
           for (const operation of activeOperations) {
             try {
@@ -581,7 +1061,7 @@ export class AgentRuntimeService {
         }
       }
 
-      // 检查每个操作的状态
+      // Check status of each operation
       const pendingInterventions = [];
 
       for (const operation of operations) {
@@ -601,7 +1081,7 @@ export class AgentRuntimeService {
               userId: metadata?.userId,
             };
 
-            // 添加具体的待处理内容
+            // Add specific pending content
             if (state.pendingToolsCalling) {
               intervention.type = 'tool_approval';
               intervention.pendingToolsCalling = state.pendingToolsCalling;
@@ -632,7 +1112,7 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 显式启动操作执行
+   * Explicitly start operation execution
    */
   async startExecution(params: StartExecutionParams): Promise<StartExecutionResult> {
     const { operationId, context, priority = 'normal', delay = 50 } = params;
@@ -640,19 +1120,19 @@ export class AgentRuntimeService {
     try {
       log('Starting execution for operation %s', operationId);
 
-      // 检查操作是否存在
+      // Check if operation exists
       const operationMetadata = await this.coordinator.getOperationMetadata(operationId);
       if (!operationMetadata) {
         throw new Error(`Operation ${operationId} not found`);
       }
 
-      // 获取当前状态
+      // Get current state
       const currentState = await this.coordinator.loadAgentState(operationId);
       if (!currentState) {
         throw new Error(`Agent state not found for operation ${operationId}`);
       }
 
-      // 检查操作状态
+      // Check operation status
       if (currentState.status === 'running') {
         throw new Error(`Operation ${operationId} is already running`);
       }
@@ -665,10 +1145,10 @@ export class AgentRuntimeService {
         throw new Error(`Operation ${operationId} is in error state`);
       }
 
-      // 构建执行上下文
+      // Build execution context
       let executionContext = context;
       if (!executionContext) {
-        // 如果没有提供上下文，从元数据构建默认上下文
+        // If no context provided, build default context from metadata
         // Note: AgentRuntimeContext requires sessionId for compatibility with @lobechat/agent-runtime
         executionContext = {
           payload: {
@@ -685,14 +1165,14 @@ export class AgentRuntimeService {
         };
       }
 
-      // 更新操作状态为运行中
+      // Update operation status to running
       await this.coordinator.saveAgentState(operationId, {
         ...currentState,
         lastModified: new Date().toISOString(),
         status: 'running',
       });
 
-      // 调度执行（如果队列服务可用）
+      // Schedule execution (if queue service is available)
       let messageId: string | undefined;
       if (this.queueService) {
         messageId = await this.queueService.scheduleMessage({
@@ -721,7 +1201,7 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 处理人工干预
+   * Process human intervention
    */
   async processHumanIntervention(params: {
     action: 'approve' | 'reject' | 'input' | 'select';
@@ -742,11 +1222,11 @@ export class AgentRuntimeService {
         action,
       );
 
-      // 高优先级调度执行（如果队列服务可用）
+      // Schedule execution with high priority (if queue service is available)
       let messageId: string | undefined;
       if (this.queueService) {
         messageId = await this.queueService.scheduleMessage({
-          context: undefined, // 会从状态管理器中获取
+          context: undefined, // Will be retrieved from state manager
           delay: 100,
           endpoint: `${this.baseURL}/run`,
           operationId,
@@ -771,7 +1251,7 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 创建 Agent Runtime 实例
+   * Create Agent Runtime instance
    */
   private async createAgentRuntime({
     metadata,
@@ -782,25 +1262,35 @@ export class AgentRuntimeService {
     operationId: string;
     stepIndex: number;
   }) {
-    // 创建 Durable Agent 实例
+    // Create Durable Agent instance
     const agent = new GeneralChatAgent({
       agentConfig: metadata?.agentConfig,
+      compressionConfig: {
+        enabled: metadata?.agentConfig?.chatConfig?.enableContextCompression ?? true,
+      },
+      dynamicInterventionAudits,
       modelRuntimeConfig: metadata?.modelRuntimeConfig,
       operationId,
       userId: metadata?.userId,
     });
 
-    // 创建流式执行器上下文
+    // Create streaming executor context
     const executorContext: RuntimeExecutorContext = {
+      agentConfig: metadata?.agentConfig,
+      discordContext: metadata?.discordContext,
+      evalContext: metadata?.evalContext,
       messageModel: this.messageModel,
       operationId,
+      serverDB: this.serverDB,
       stepIndex,
+      stream: metadata?.stream,
       streamManager: this.streamManager,
       toolExecutionService: this.toolExecutionService,
+      topicId: metadata?.topicId,
       userId: metadata?.userId,
     };
 
-    // 创建 Agent Runtime 实例
+    // Create Agent Runtime instance
     const runtime = new AgentRuntime(agent as any, {
       executors: createRuntimeExecutors(executorContext),
     });
@@ -809,7 +1299,7 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 处理人工干预逻辑
+   * Handle human intervention logic
    */
   private async handleHumanIntervention(
     runtime: AgentRuntime,
@@ -819,13 +1309,13 @@ export class AgentRuntimeService {
     const { humanInput, approvedToolCall, rejectionReason } = intervention;
 
     if (approvedToolCall && state.status === 'waiting_for_human') {
-      // TODO: 实现 approveToolCall 逻辑
+      // TODO: implement approveToolCall logic
       return { newState: state, nextContext: undefined };
     } else if (rejectionReason && state.status === 'waiting_for_human') {
-      // TODO: 实现 rejectToolCall 逻辑
+      // TODO: implement rejectToolCall logic
       return { newState: state, nextContext: undefined };
     } else if (humanInput) {
-      // TODO: 实现 processHumanInput 逻辑
+      // TODO: implement processHumanInput logic
       return { newState: state, nextContext: undefined };
     }
 
@@ -833,47 +1323,209 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 决定是否继续执行
+   * Deliver a webhook payload via fetch or QStash.
+   * Fire-and-forget: errors are logged but never thrown.
+   */
+  private async deliverWebhook(
+    url: string,
+    payload: Record<string, unknown>,
+    delivery: 'fetch' | 'qstash' = 'fetch',
+    operationId: string,
+  ): Promise<void> {
+    try {
+      if (delivery === 'qstash') {
+        const { Client } = await import('@upstash/qstash');
+        const client = new Client({ token: process.env.QSTASH_TOKEN! });
+        await client.publishJSON({
+          body: payload,
+          headers: {
+            ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET && {
+              'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+            }),
+          },
+          url,
+        });
+      } else {
+        await fetch(url, {
+          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+        });
+      }
+    } catch (error) {
+      console.error('[%s] Webhook delivery failed (%s → %s):', operationId, delivery, url, error);
+    }
+  }
+
+  /**
+   * Trigger completion webhook if configured in state metadata.
+   * Fire-and-forget: errors are logged but never thrown.
+   */
+  private async triggerCompletionWebhook(
+    state: any,
+    operationId: string,
+    reason: StepCompletionReason,
+  ): Promise<void> {
+    const webhook = state.metadata?.completionWebhook;
+    if (!webhook?.url) return;
+
+    log('[%s] Triggering completion webhook: %s', operationId, webhook.url);
+
+    const duration = state.createdAt ? Date.now() - new Date(state.createdAt).getTime() : undefined;
+
+    // Extract last assistant content from state messages
+    const lastAssistantContent = state.messages
+      ?.slice()
+      .reverse()
+      .find(
+        (m: { content?: string; role: string }) => m.role === 'assistant' && m.content,
+      )?.content;
+
+    // Extract first user prompt for downstream consumers (e.g., topic title summarization)
+    const userPrompt = state.messages?.find(
+      (m: { content?: string; role: string }) => m.role === 'user',
+    )?.content;
+
+    const delivery = state.metadata?.webhookDelivery || 'fetch';
+
+    await this.deliverWebhook(
+      webhook.url,
+      {
+        ...webhook.body,
+        cost: state.cost?.total,
+        duration,
+        errorDetail: state.error,
+        errorMessage: this.extractErrorMessage(state.error),
+        lastAssistantContent,
+        llmCalls: state.usage?.llm?.apiCalls,
+        operationId,
+        reason,
+        status: state.status,
+        steps: state.stepCount,
+        toolCalls: state.usage?.tools?.totalCalls,
+        topicId: state.metadata?.topicId,
+        totalTokens: state.usage?.llm?.tokens?.total,
+        type: 'completion',
+        userId: state.metadata?.userId,
+        userPrompt,
+      },
+      delivery,
+      operationId,
+    );
+  }
+
+  /**
+   * Trigger step webhook if configured in state metadata.
+   * Reads accumulated step tracking data and fires webhook with step presentation data.
+   * Fire-and-forget: errors are logged but never thrown.
+   */
+  private async triggerStepWebhook(
+    state: any,
+    operationId: string,
+    presentationData: Record<string, unknown>,
+  ): Promise<void> {
+    const webhook = state.metadata?.stepWebhook;
+    if (!webhook?.url) return;
+
+    log('[%s] Triggering step webhook: %s', operationId, webhook.url);
+
+    const tracking = state.metadata?._stepTracking || {};
+    const delivery = state.metadata?.webhookDelivery || 'fetch';
+    const elapsedMs = state.createdAt
+      ? Date.now() - new Date(state.createdAt).getTime()
+      : undefined;
+
+    await this.deliverWebhook(
+      webhook.url,
+      {
+        ...webhook.body,
+        ...presentationData,
+        elapsedMs,
+        lastLLMContent: tracking.lastLLMContent,
+        lastToolsCalling: tracking.lastToolsCalling,
+        operationId,
+        totalToolCalls: tracking.totalToolCalls ?? 0,
+        type: 'step',
+      },
+      delivery,
+      operationId,
+    );
+  }
+
+  /**
+   * Extract a human-readable error message from the agent state error object.
+   * Handles both raw ChatCompletionErrorPayload (from runtime.step catch) and
+   * formatted ChatMessageError (from executeStep catch).
+   */
+  private extractErrorMessage(error: any): string | undefined {
+    if (!error) return undefined;
+
+    // Path B: formatted ChatMessageError — { body, message, type }
+    // Try to extract meaningful info from body first
+    if (error.body) {
+      const body = error.body;
+      // OpenAI-style: body.error.message
+      if (body.error?.message) return body.error.message;
+      // Direct message on body
+      if (body.message) return body.message;
+    }
+
+    // Path A: raw ChatCompletionErrorPayload — { errorType, error: {...}, provider }
+    if (error.error) {
+      const inner = error.error;
+      if (inner.error?.message) return inner.error.message;
+      if (inner.message) return inner.message;
+    }
+
+    // Fallback to message or type
+    if (error.message && error.message !== 'error') return error.message;
+    if (error.type || error.errorType) return String(error.type || error.errorType);
+
+    return undefined;
+  }
+
+  /**
+   * Decide whether to continue execution
    */
   private shouldContinueExecution(state: any, context?: any): boolean {
-    // 已完成
+    // Completed
     if (state.status === 'done') return false;
 
-    // 需要人工干预
+    // Needs human intervention
     if (state.status === 'waiting_for_human') return false;
 
-    // 出错了
+    // Error occurred
     if (state.status === 'error') return false;
 
-    // 被中断
+    // Interrupted
     if (state.status === 'interrupted') return false;
 
-    // 达到最大步数
-    if (state.maxSteps && state.stepCount >= state.maxSteps) return false;
+    // maxSteps is handled by runtime.step() which sets forceFinish → status:'done'
+    // No redundant check here — trust the runtime state machine
 
-    // 超过成本限制
+    // Exceeded cost limit
     if (state.costLimit && state.cost?.total >= state.costLimit.maxTotalCost) {
       return state.costLimit.onExceeded !== 'stop';
     }
 
-    // 没有下一个上下文
+    // No next context
     if (!context) return false;
 
     return true;
   }
 
   /**
-   * 计算步骤延迟
+   * Calculate step delay
    */
   private calculateStepDelay(stepResult: any): number {
     const baseDelay = 50;
 
-    // 如果有工具调用，延迟长一点
+    // If there are tool calls, add longer delay
     if (stepResult.events?.some((e: any) => e.type === 'tool_result')) {
       return baseDelay + 50;
     }
 
-    // 如果有错误，使用指数退避
+    // If there are errors, use exponential backoff
     if (stepResult.events?.some((e: any) => e.type === 'error')) {
       return Math.min(baseDelay * 2, 1000);
     }
@@ -882,15 +1534,15 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 计算优先级
+   * Calculate priority
    */
   private calculatePriority(stepResult: any): 'high' | 'normal' | 'low' {
-    // 如果需要人工干预，高优先级
+    // If human intervention needed, high priority
     if (stepResult.newState?.status === 'waiting_for_human') {
       return 'high';
     }
 
-    // 如果有错误，正常优先级
+    // If there are errors, normal priority
     if (stepResult.events?.some((e: any) => e.type === 'error')) {
       return 'normal';
     }
@@ -899,7 +1551,7 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 确定操作完成原因
+   * Determine operation completion reason
    */
   private determineCompletionReason(state: AgentState): StepCompletionReason {
     if (state.status === 'done') return 'done';
@@ -912,20 +1564,20 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 同步执行 Agent 操作直到完成
+   * Synchronously execute Agent operation until completion
    *
-   * 用于测试场景，不依赖 QueueService，直接在当前进程中执行所有步骤。
+   * Used in test scenarios, doesn't depend on QueueService, executes all steps directly in the current process.
    *
-   * @param operationId 操作 ID
-   * @param options 执行选项
-   * @returns 最终状态
+   * @param operationId Operation ID
+   * @param options Execution options
+   * @returns Final state
    *
    * @example
    * ```ts
-   * // 创建操作（不自动启动队列）
+   * // Create operation (without auto-starting queue)
    * const result = await service.createOperation({ ...params, autoStart: false });
    *
-   * // 同步执行到完成
+   * // Synchronously execute to completion
    * const finalState = await service.executeSync(result.operationId);
    * expect(finalState.status).toBe('done');
    * ```
@@ -933,19 +1585,19 @@ export class AgentRuntimeService {
   async executeSync(
     operationId: string,
     options?: {
-      /** 初始上下文（如果不提供，从状态中推断） */
+      /** Initial context (if not provided, inferred from state) */
       initialContext?: AgentRuntimeContext;
-      /** 最大步数限制，防止无限循环，默认 9999 */
+      /** Maximum step limit to prevent infinite loops, defaults to 9999 */
       maxSteps?: number;
-      /** 每步执行后的回调（用于调试） */
+      /** Callback after each step execution (for debugging) */
       onStepComplete?: (stepIndex: number, state: AgentState) => void;
     },
   ): Promise<AgentState> {
-    const { maxSteps = 9999, onStepComplete, initialContext } = options ?? {};
+    const { maxSteps = 999, onStepComplete, initialContext } = options ?? {};
 
     log('[%s] Starting sync execution (maxSteps: %d)', operationId, maxSteps);
 
-    // 加载初始状态
+    // Load initial state
     const initialState = await this.coordinator.loadAgentState(operationId);
     if (!initialState) {
       throw new Error(`Agent state not found for operation ${operationId}`);
@@ -953,7 +1605,7 @@ export class AgentRuntimeService {
 
     let state: AgentState = initialState;
 
-    // 构建初始上下文
+    // Build initial context
     // Priority: explicit initialContext param > saved initialContext in state > default
     let context: AgentRuntimeContext | undefined =
       initialContext ??
@@ -971,22 +1623,22 @@ export class AgentRuntimeService {
 
     let stepIndex = state.stepCount;
 
-    // 执行循环
+    // Execution loop
     while (stepIndex < maxSteps) {
-      // 检查终止条件
+      // Check termination conditions
       if (state.status === 'done' || state.status === 'error' || state.status === 'interrupted') {
         log('[%s] Sync execution finished with status: %s', operationId, state.status);
         break;
       }
 
-      // 检查是否需要人工干预
+      // Check if human intervention is needed
       if (state.status === 'waiting_for_human') {
         log('[%s] Sync execution paused: waiting for human intervention', operationId);
         break;
       }
 
-      // 执行一步
-      log('[%s] Executing step %d', operationId, stepIndex);
+      // Execute one step
+      log('[%s][%d] Start executing...', operationId, stepIndex);
       const result = await this.executeStep({
         context,
         operationId,
@@ -997,12 +1649,12 @@ export class AgentRuntimeService {
       context = result.stepResult.nextContext;
       stepIndex++;
 
-      // 回调
+      // Callback
       if (onStepComplete) {
         onStepComplete(stepIndex, state);
       }
 
-      // 检查是否应该继续
+      // Check if should continue
       if (!this.shouldContinueExecution(state, context)) {
         log('[%s] Sync execution stopped: shouldContinue=false', operationId);
         break;
@@ -1011,8 +1663,8 @@ export class AgentRuntimeService {
 
     if (stepIndex >= maxSteps) {
       log('[%s] Sync execution stopped: reached maxSteps (%d)', operationId, maxSteps);
-      // 如果因为 executeSync 的 maxSteps 限制停止，需要手动调用 onComplete
-      // 注意：如果是因为 state.maxSteps 达到，onComplete 已经在 executeStep 中被调用
+      // If stopped due to executeSync's maxSteps limit, need to manually call onComplete
+      // Note: If stopped due to state.maxSteps being reached, onComplete has already been called in executeStep
       const callbacks = this.getStepCallbacks(operationId);
       if (callbacks?.onComplete && state.status !== 'done' && state.status !== 'error') {
         try {
@@ -1032,7 +1684,7 @@ export class AgentRuntimeService {
   }
 
   /**
-   * 获取 Coordinator 实例（用于测试）
+   * Get Coordinator instance (for testing)
    */
   getCoordinator(): AgentRuntimeCoordinator {
     return this.coordinator;

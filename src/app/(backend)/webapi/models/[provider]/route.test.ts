@@ -1,16 +1,15 @@
 // @vitest-environment node
+import { type LobeRuntimeAI } from '@lobechat/model-runtime';
 import { ModelRuntime } from '@lobechat/model-runtime';
 import { ChatErrorType } from '@lobechat/types';
 import { getXorPayload } from '@lobechat/utils/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LOBE_CHAT_AUTH_HEADER } from '@/const/auth';
+import type * as EnvsAuthModule from '@/envs/auth';
+import { LOBE_CHAT_AUTH_HEADER } from '@/envs/auth';
+import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
 
 import { GET } from './route';
-
-vi.mock('@clerk/nextjs/server', () => ({
-  getAuth: vi.fn(),
-}));
 
 vi.mock('@/app/(backend)/middleware/auth/utils', () => ({
   checkAuthMethod: vi.fn(),
@@ -18,6 +17,25 @@ vi.mock('@/app/(backend)/middleware/auth/utils', () => ({
 
 vi.mock('@lobechat/utils/server', () => ({
   getXorPayload: vi.fn(),
+}));
+
+vi.mock('@/envs/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof EnvsAuthModule>();
+  return {
+    ...actual,
+  };
+});
+
+vi.mock('@/auth', () => ({
+  auth: {
+    api: {
+      getSession: vi.fn().mockResolvedValue(null),
+    },
+  },
+}));
+
+vi.mock('@/server/modules/ModelRuntime', () => ({
+  initModelRuntimeFromDB: vi.fn(),
 }));
 
 let request: Request;
@@ -41,7 +59,6 @@ describe('GET handler', () => {
       const mockParams = Promise.resolve({ provider: 'google' });
 
       vi.mocked(getXorPayload).mockReturnValueOnce({
-        accessCode: 'test-access-code',
         apiKey: 'test-api-key',
       });
 
@@ -49,9 +66,12 @@ describe('GET handler', () => {
       errorWithStack.stack =
         'Error: Something went wrong\n    at Object.<anonymous> (/path/to/file.ts:10:15)';
 
-      vi.spyOn(ModelRuntime, 'initializeWithProvider').mockResolvedValue({
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi.fn(),
         models: vi.fn().mockRejectedValue(errorWithStack),
-      } as any);
+      };
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
 
       const response = await GET(request, { params: mockParams });
       const responseBody = await response.json();
@@ -73,7 +93,6 @@ describe('GET handler', () => {
       const mockParams = Promise.resolve({ provider: 'google' });
 
       vi.mocked(getXorPayload).mockReturnValueOnce({
-        accessCode: 'test-access-code',
         apiKey: 'test-api-key',
       });
 
@@ -87,9 +106,12 @@ describe('GET handler', () => {
       const customError = new CustomError('Custom error occurred');
       customError.stack = 'CustomError: Custom error occurred\n    at somewhere';
 
-      vi.spyOn(ModelRuntime, 'initializeWithProvider').mockResolvedValue({
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi.fn(),
         models: vi.fn().mockRejectedValue(customError),
-      } as any);
+      };
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
 
       const response = await GET(request, { params: mockParams });
       const responseBody = await response.json();
@@ -103,7 +125,6 @@ describe('GET handler', () => {
       const mockParams = Promise.resolve({ provider: 'google' });
 
       vi.mocked(getXorPayload).mockReturnValueOnce({
-        accessCode: 'test-access-code',
         apiKey: 'test-api-key',
       });
 
@@ -112,9 +133,12 @@ describe('GET handler', () => {
         error: { code: 'PROVIDER_ERROR', details: 'API limit exceeded' },
       };
 
-      vi.spyOn(ModelRuntime, 'initializeWithProvider').mockResolvedValue({
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi.fn(),
         models: vi.fn().mockRejectedValue(structuredError),
-      } as any);
+      };
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
 
       const response = await GET(request, { params: mockParams });
       const responseBody = await response.json();
@@ -128,13 +152,15 @@ describe('GET handler', () => {
       const mockParams = Promise.resolve({ provider: 'google' });
 
       vi.mocked(getXorPayload).mockReturnValueOnce({
-        accessCode: 'test-access-code',
         apiKey: 'test-api-key',
       });
 
-      vi.spyOn(ModelRuntime, 'initializeWithProvider').mockResolvedValue({
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi.fn(),
         models: vi.fn().mockRejectedValue(new Error('Failed')),
-      } as any);
+      };
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
 
       const response = await GET(request, { params: mockParams });
 
@@ -145,13 +171,15 @@ describe('GET handler', () => {
       const mockParams = Promise.resolve({ provider: 'openai' });
 
       vi.mocked(getXorPayload).mockReturnValueOnce({
-        accessCode: 'test-access-code',
         apiKey: 'test-api-key',
       });
 
-      vi.spyOn(ModelRuntime, 'initializeWithProvider').mockResolvedValue({
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi.fn(),
         models: vi.fn().mockRejectedValue(new Error('Failed')),
-      } as any);
+      };
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
 
       const response = await GET(request, { params: mockParams });
       const responseBody = await response.json();
@@ -165,7 +193,6 @@ describe('GET handler', () => {
       const mockParams = Promise.resolve({ provider: 'openai' });
 
       vi.mocked(getXorPayload).mockReturnValueOnce({
-        accessCode: 'test-access-code',
         apiKey: 'test-api-key',
       });
 
@@ -174,9 +201,12 @@ describe('GET handler', () => {
         { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
       ];
 
-      vi.spyOn(ModelRuntime, 'initializeWithProvider').mockResolvedValue({
+      const mockRuntime: LobeRuntimeAI = {
+        baseURL: 'abc',
+        chat: vi.fn(),
         models: vi.fn().mockResolvedValue(mockModelList),
-      } as any);
+      };
+      vi.mocked(initModelRuntimeFromDB).mockResolvedValue(new ModelRuntime(mockRuntime));
 
       const response = await GET(request, { params: mockParams });
       const responseBody = await response.json();

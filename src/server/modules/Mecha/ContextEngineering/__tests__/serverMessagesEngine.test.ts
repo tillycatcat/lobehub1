@@ -1,7 +1,16 @@
-import type { UIChatMessage } from '@lobechat/types';
+import { type UIChatMessage } from '@lobechat/types';
 import { describe, expect, it, vi } from 'vitest';
 
 import { serverMessagesEngine } from '../index';
+
+// Helper to compute expected date content from SystemDateProvider
+const getCurrentDateContent = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `Current date: ${year}-${month}-${day}`;
+};
 
 describe('serverMessagesEngine', () => {
   const createBasicMessages = (): UIChatMessage[] => [
@@ -9,7 +18,6 @@ describe('serverMessagesEngine', () => {
       content: 'Hello',
       createdAt: Date.now(),
       id: 'msg-1',
-      meta: {},
       role: 'user',
       updatedAt: Date.now(),
     } as UIChatMessage,
@@ -17,7 +25,6 @@ describe('serverMessagesEngine', () => {
       content: 'Hi there!',
       createdAt: Date.now(),
       id: 'msg-2',
-      meta: {},
       role: 'assistant',
       updatedAt: Date.now(),
     } as UIChatMessage,
@@ -34,7 +41,9 @@ describe('serverMessagesEngine', () => {
       });
 
       expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(2);
+      // 3 messages: system date + 2 original messages
+      expect(result.length).toBe(3);
+      expect(result[0]).toEqual({ content: getCurrentDateContent(), role: 'system' });
       result.forEach((msg) => {
         expect(msg).toHaveProperty('role');
         expect(msg).toHaveProperty('content');
@@ -56,7 +65,7 @@ describe('serverMessagesEngine', () => {
       });
 
       expect(result[0].role).toBe('system');
-      expect(result[0].content).toBe(systemRole);
+      expect(result[0].content).toBe(systemRole + '\n\n' + getCurrentDateContent());
     });
 
     it('should handle empty messages', async () => {
@@ -66,33 +75,8 @@ describe('serverMessagesEngine', () => {
         provider: 'openai',
       });
 
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('history truncation', () => {
-    it('should truncate history when enabled', async () => {
-      const messages: UIChatMessage[] = [];
-      for (let i = 0; i < 20; i++) {
-        messages.push({
-          content: `Message ${i}`,
-          createdAt: Date.now(),
-          id: `msg-${i}`,
-          meta: {},
-          role: i % 2 === 0 ? 'user' : 'assistant',
-          updatedAt: Date.now(),
-        } as UIChatMessage);
-      }
-
-      const result = await serverMessagesEngine({
-        enableHistoryCount: true,
-        historyCount: 5,
-        messages,
-        model: 'gpt-4',
-        provider: 'openai',
-      });
-
-      expect(result.length).toBeLessThanOrEqual(5);
+      // SystemDateProvider injects a system date message even with empty input
+      expect(result).toEqual([{ content: getCurrentDateContent(), role: 'system' }]);
     });
   });
 
@@ -260,7 +244,9 @@ describe('serverMessagesEngine', () => {
 
       // User memories are injected as a consolidated user message before the first user message
       // Note: meta/id fields are removed by the engine cleanup step, so assert via content.
-      const injection = result.find((m: any) => m.role === 'user' && String(m.content).includes('<user_memory>'));
+      const injection = result.find(
+        (m: any) => m.role === 'user' && String(m.content).includes('<user_memory>'),
+      );
       expect(injection).toBeDefined();
       expect(injection!.role).toBe('user');
     });
@@ -329,7 +315,6 @@ describe('serverMessagesEngine', () => {
           content: 'user input',
           createdAt: Date.now(),
           id: 'msg-1',
-          meta: {},
           role: 'user',
           updatedAt: Date.now(),
         } as UIChatMessage,

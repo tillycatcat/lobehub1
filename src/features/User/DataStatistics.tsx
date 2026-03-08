@@ -1,13 +1,14 @@
 'use client';
 
-import { Flexbox, type FlexboxProps, Icon, Tooltip } from '@lobehub/ui';
+import { type FlexboxProps } from '@lobehub/ui';
+import { Flexbox, Tooltip } from '@lobehub/ui';
 import { Badge } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { isUndefined } from 'es-toolkit/compat';
-import { LoaderCircle } from 'lucide-react';
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import { useClientDataSWR } from '@/libs/swr';
 import { messageService } from '@/services/message';
 import { sessionService } from '@/services/session';
@@ -65,7 +66,7 @@ const DataStatistics = memo<Omit<FlexboxProps, 'children'>>(({ style, ...rest })
 
   const { t } = useTranslation('common');
 
-  const loading = useMemo(() => <Icon icon={LoaderCircle} spin />, []);
+  const loading = <NeuralNetworkLoading size={20} />;
 
   const items = [
     {
@@ -88,9 +89,9 @@ const DataStatistics = memo<Omit<FlexboxProps, 'children'>>(({ style, ...rest })
 
   return (
     <Flexbox
+      horizontal
       align={'center'}
       gap={4}
-      horizontal
       paddingInline={8}
       style={{ marginBottom: 8, ...style }}
       width={'100%'}
@@ -101,11 +102,11 @@ const DataStatistics = memo<Omit<FlexboxProps, 'children'>>(({ style, ...rest })
           const showBadge = Boolean(item.countToady && item.countToady > 0);
           return (
             <Flexbox
+              horizontal
               align={'center'}
               className={styles.card}
               flex={showBadge && !mobile ? 2 : 1}
               gap={4}
-              horizontal
               justify={'space-between'}
               key={item.key}
             >

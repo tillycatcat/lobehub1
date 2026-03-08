@@ -1,4 +1,4 @@
-import { AIChatModelCard } from '../types/aiModel';
+import { type AIChatModelCard } from '../types/aiModel';
 
 const aihubmixModels: AIChatModelCard[] = [
   {
@@ -25,7 +25,7 @@ const aihubmixModels: AIChatModelCard[] = [
     },
     releasedAt: '2025-12-11',
     settings: {
-      extendParams: ['gpt5_1ReasoningEffort', 'textVerbosity'],
+      extendParams: ['gpt5_2ReasoningEffort', 'textVerbosity'],
       searchImpl: 'params',
     },
     type: 'chat',
@@ -51,6 +51,7 @@ const aihubmixModels: AIChatModelCard[] = [
     },
     releasedAt: '2025-12-11',
     settings: {
+      extendParams: ['gpt5_2ProReasoningEffort', 'textVerbosity'],
       searchImpl: 'params',
     },
     type: 'chat',
@@ -189,7 +190,8 @@ const aihubmixModels: AIChatModelCard[] = [
       vision: true,
     },
     contextWindowTokens: 400_000,
-    description: 'GPT-5 pro uses more compute to think deeper and consistently deliver better answers.',
+    description:
+      'GPT-5 pro uses more compute to think deeper and consistently deliver better answers.',
     displayName: 'GPT-5 pro',
     id: 'gpt-5-pro',
     maxOutput: 272_000,
@@ -478,7 +480,8 @@ const aihubmixModels: AIChatModelCard[] = [
       vision: true,
     },
     contextWindowTokens: 1_047_576,
-    description: 'GPT-4.1 is our flagship model for complex tasks and cross-domain problem solving.',
+    description:
+      'GPT-4.1 is our flagship model for complex tasks and cross-domain problem solving.',
     displayName: 'GPT-4.1',
     id: 'gpt-4.1',
     maxOutput: 32_768,
@@ -502,8 +505,7 @@ const aihubmixModels: AIChatModelCard[] = [
       vision: true,
     },
     contextWindowTokens: 1_047_576,
-    description:
-      'GPT-4.1 mini balances intelligence, speed, and cost for many use cases.',
+    description: 'GPT-4.1 mini balances intelligence, speed, and cost for many use cases.',
     displayName: 'GPT-4.1 mini',
     id: 'gpt-4.1-mini',
     maxOutput: 32_768,
@@ -614,7 +616,6 @@ const aihubmixModels: AIChatModelCard[] = [
     description:
       'Latest Grok flagship with unmatched performance in language, math, and reasoning — a true all-rounder. Currently points to grok-4-0709; due to limited resources it is temporarily 10% higher than official pricing and is expected to return to official price later.',
     displayName: 'Grok 4 0709',
-    enabled: true,
     id: 'grok-4',
     pricing: {
       units: [
@@ -676,9 +677,43 @@ const aihubmixModels: AIChatModelCard[] = [
     },
     contextWindowTokens: 200_000,
     description:
+      'Claude Opus 4.6 is Anthropic’s most intelligent model for building agents and coding.',
+    displayName: 'Claude Opus 4.6',
+    enabled: true,
+    id: 'claude-opus-4-6',
+    maxOutput: 128_000,
+    pricing: {
+      units: [
+        { name: 'textInput_cacheRead', rate: 0.5, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textInput', rate: 5, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textOutput', rate: 25, strategy: 'fixed', unit: 'millionTokens' },
+        {
+          lookup: { prices: { '1h': 10, '5m': 6.25 }, pricingParams: ['ttl'] },
+          name: 'textInput_cacheWrite',
+          strategy: 'lookup',
+          unit: 'millionTokens',
+        },
+      ],
+    },
+    releasedAt: '2026-02-05',
+    settings: {
+      extendParams: ['disableContextCaching', 'enableAdaptiveThinking', 'effort'],
+      searchImpl: 'params',
+    },
+    type: 'chat',
+  },
+  {
+    abilities: {
+      functionCall: true,
+      reasoning: true,
+      search: true,
+      structuredOutput: true,
+      vision: true,
+    },
+    contextWindowTokens: 200_000,
+    description:
       'Claude Opus 4.5 is Anthropic’s flagship model, combining top-tier intelligence with scalable performance for complex, high-quality reasoning tasks.',
     displayName: 'Claude Opus 4.5',
-    enabled: true,
     id: 'claude-opus-4-5-20251101',
     maxOutput: 64_000,
     pricing: {
@@ -778,10 +813,49 @@ const aihubmixModels: AIChatModelCard[] = [
       vision: true,
     },
     contextWindowTokens: 200_000,
+    description: 'Claude Sonnet 4.6 is Anthropic’s best combination of speed and intelligence.',
+    displayName: 'Claude Sonnet 4.6',
+    enabled: true,
+    id: 'claude-sonnet-4-6',
+    maxOutput: 64_000,
+    pricing: {
+      units: [
+        { name: 'textInput_cacheRead', rate: 0.3, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textInput', rate: 3, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textOutput', rate: 15, strategy: 'fixed', unit: 'millionTokens' },
+        {
+          lookup: { prices: { '1h': 6, '5m': 3.75 }, pricingParams: ['ttl'] },
+          name: 'textInput_cacheWrite',
+          strategy: 'lookup',
+          unit: 'millionTokens',
+        },
+      ],
+    },
+    releasedAt: '2026-02-17',
+    settings: {
+      extendParams: [
+        'disableContextCaching',
+        'enableAdaptiveThinking',
+        'enableReasoning',
+        'reasoningBudgetToken',
+        'effort',
+      ],
+      searchImpl: 'params',
+    },
+    type: 'chat',
+  },
+  {
+    abilities: {
+      functionCall: true,
+      reasoning: true,
+      search: true,
+      structuredOutput: true,
+      vision: true,
+    },
+    contextWindowTokens: 200_000,
     description:
       'Sonnet 4.5 is the world’s best model for agents, coding, and computer use. It is also our most accurate and detailed model on long-running tasks, with enhanced knowledge in coding, finance, and cybersecurity.',
     displayName: 'Claude Sonnet 4.5',
-    enabled: true,
     id: 'claude-sonnet-4-5-20250929',
     maxOutput: 64_000,
     pricing: {
@@ -1086,6 +1160,97 @@ const aihubmixModels: AIChatModelCard[] = [
   },
   {
     abilities: {
+      imageOutput: true,
+      reasoning: true,
+      search: true,
+      vision: true,
+    },
+    contextWindowTokens: 131_072 + 32_768,
+    description:
+      "Gemini 3.1 Flash Image (Nano Banana 2) is Google's fastest native image generation model with thinking support, conversational image generation and editing.",
+    displayName: 'Nano Banana 2',
+    enabled: true,
+    id: 'gemini-3.1-flash-image-preview',
+    maxOutput: 32_768,
+    pricing: {
+      approximatePricePerImage: 0.067,
+      units: [
+        { name: 'imageOutput', rate: 60, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textInput', rate: 0.25, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textOutput', rate: 1.5, strategy: 'fixed', unit: 'millionTokens' },
+      ],
+    },
+    releasedAt: '2026-02-26',
+    settings: {
+      extendParams: ['imageAspectRatio2', 'imageResolution2', 'thinkingLevel4'],
+      searchImpl: 'params',
+      searchProvider: 'google',
+    },
+    type: 'chat',
+  },
+  {
+    abilities: {
+      functionCall: true,
+      reasoning: true,
+      search: true,
+      structuredOutput: true,
+      video: true,
+      vision: true,
+    },
+    contextWindowTokens: 1_048_576 + 65_536,
+    description:
+      'Gemini 3.1 Pro Preview provides better thinking, improved token efficiency, and a reliable experience optimized for software engineering behavior.',
+    displayName: 'Gemini 3.1 Pro Preview',
+    enabled: true,
+    id: 'gemini-3.1-pro-preview',
+    maxOutput: 65_536,
+    pricing: {
+      units: [
+        {
+          name: 'textInput_cacheRead',
+          strategy: 'tiered',
+          tiers: [
+            { rate: 0.2, upTo: 200_000 },
+            { rate: 0.4, upTo: 'infinity' },
+          ],
+          unit: 'millionTokens',
+        },
+        {
+          name: 'textInput',
+          strategy: 'tiered',
+          tiers: [
+            { rate: 2, upTo: 200_000 },
+            { rate: 4, upTo: 'infinity' },
+          ],
+          unit: 'millionTokens',
+        },
+        {
+          name: 'textOutput',
+          strategy: 'tiered',
+          tiers: [
+            { rate: 12, upTo: 200_000 },
+            { rate: 18, upTo: 'infinity' },
+          ],
+          unit: 'millionTokens',
+        },
+        {
+          lookup: { prices: { '1h': 4.5 }, pricingParams: ['ttl'] },
+          name: 'textInput_cacheWrite',
+          strategy: 'lookup',
+          unit: 'millionTokens',
+        },
+      ],
+    },
+    releasedAt: '2026-02-19',
+    settings: {
+      extendParams: ['thinkingLevel3', 'urlContext'],
+      searchImpl: 'params',
+      searchProvider: 'google',
+    },
+    type: 'chat',
+  },
+  {
+    abilities: {
       functionCall: true,
       reasoning: true,
       search: true,
@@ -1096,7 +1261,6 @@ const aihubmixModels: AIChatModelCard[] = [
     description:
       'Gemini 3 Pro is Google’s most intelligent model with SOTA reasoning and multimodal understanding, plus strong agent and vibe-coding capabilities.',
     displayName: 'Gemini 3 Pro Preview',
-    enabled: true,
     id: 'gemini-3-pro-preview',
     maxOutput: 65_536,
     pricing: {
@@ -1137,6 +1301,42 @@ const aihubmixModels: AIChatModelCard[] = [
       ],
     },
     releasedAt: '2025-11-18',
+    settings: {
+      extendParams: ['thinkingLevel2', 'urlContext'],
+      searchImpl: 'params',
+      searchProvider: 'google',
+    },
+    type: 'chat',
+  },
+  {
+    abilities: {
+      functionCall: true,
+      reasoning: true,
+      search: true,
+      video: true,
+      vision: true,
+    },
+    contextWindowTokens: 1_048_576 + 65_536,
+    description:
+      'Gemini 3 Flash is the smartest model built for speed, combining cutting-edge intelligence with excellent search grounding.',
+    displayName: 'Gemini 3 Flash Preview',
+    enabled: true,
+    id: 'gemini-3-flash-preview',
+    maxOutput: 65_536,
+    pricing: {
+      units: [
+        { name: 'textInput_cacheRead', rate: 0.05, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textInput', rate: 0.5, strategy: 'fixed', unit: 'millionTokens' },
+        { name: 'textOutput', rate: 3, strategy: 'fixed', unit: 'millionTokens' },
+        {
+          lookup: { prices: { '1h': 1 }, pricingParams: ['ttl'] },
+          name: 'textInput_cacheWrite',
+          strategy: 'lookup',
+          unit: 'millionTokens',
+        },
+      ],
+    },
+    releasedAt: '2025-12-17',
     settings: {
       extendParams: ['thinkingLevel', 'urlContext'],
       searchImpl: 'params',
@@ -1210,7 +1410,7 @@ const aihubmixModels: AIChatModelCard[] = [
       vision: true,
     },
     contextWindowTokens: 1_048_576 + 65_536,
-    description: "Gemini 2.5 Flash is Google’s best-value model with full capabilities.",
+    description: 'Gemini 2.5 Flash is Google’s best-value model with full capabilities.',
     displayName: 'Gemini 2.5 Flash',
     id: 'gemini-2.5-flash',
     maxOutput: 65_536,
@@ -1238,7 +1438,6 @@ const aihubmixModels: AIChatModelCard[] = [
     description:
       'Nano Banana is Google’s newest, fastest, and most efficient native multimodal model, allowing image generation and editing through conversation.',
     displayName: 'Nano Banana',
-    enabled: true,
     id: 'gemini-2.5-flash-image',
     maxOutput: 8192,
     pricing: {
@@ -1262,7 +1461,7 @@ const aihubmixModels: AIChatModelCard[] = [
     },
     contextWindowTokens: 1_048_576 + 65_536,
     description:
-      "Gemini 2.5 Flash-Lite is Google’s smallest, best-value model, designed for large-scale use.",
+      'Gemini 2.5 Flash-Lite is Google’s smallest, best-value model, designed for large-scale use.',
     displayName: 'Gemini 2.5 Flash-Lite',
     id: 'gemini-2.5-flash-lite',
     maxOutput: 65_536,

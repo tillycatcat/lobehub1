@@ -1,6 +1,9 @@
-import { type GlobalState, INITIAL_STATUS } from '../initialState';
+import { type GlobalState } from '../initialState';
+import { INITIAL_STATUS } from '../initialState';
 
 export const systemStatus = (s: GlobalState) => s.status;
+
+const agentBuilderPanelWidth = (s: GlobalState) => s.status.agentBuilderPanelWidth || 360;
 
 const sessionGroupKeys = (s: GlobalState): string[] =>
   s.status.expandSessionGroupKeys || INITIAL_STATUS.expandSessionGroupKeys;
@@ -23,16 +26,27 @@ const showImagePanel = (s: GlobalState) => s.status.showImagePanel;
 const showImageTopicPanel = (s: GlobalState) => s.status.showImageTopicPanel;
 const hidePWAInstaller = (s: GlobalState) => s.status.hidePWAInstaller;
 const isShowCredit = (s: GlobalState) => s.status.isShowCredit;
-const themeMode = (s: GlobalState) => s.status.themeMode || 'auto';
 const language = (s: GlobalState) => s.status.language || 'auto';
+const modelSwitchPanelGroupMode = (s: GlobalState) =>
+  s.status.modelSwitchPanelGroupMode || 'byProvider';
+const modelSwitchPanelWidth = (s: GlobalState) => s.status.modelSwitchPanelWidth || 430;
+const pageAgentPanelWidth = (s: GlobalState) => s.status.pageAgentPanelWidth || 360;
 
 const showChatHeader = (s: GlobalState) => !s.status.zenMode;
 const inZenMode = (s: GlobalState) => s.status.zenMode;
-const leftPanelWidth = (s: GlobalState) => s.status.leftPanelWidth;
+const leftPanelWidth = (s: GlobalState): number => {
+  const width = s.status.leftPanelWidth;
+  return typeof width === 'string' ? Number.parseInt(width) : width;
+};
 const portalWidth = (s: GlobalState) => s.status.portalWidth || 400;
 const filePanelWidth = (s: GlobalState) => s.status.filePanelWidth;
+const groupAgentBuilderPanelWidth = (s: GlobalState) => s.status.groupAgentBuilderPanelWidth || 360;
 const imagePanelWidth = (s: GlobalState) => s.status.imagePanelWidth;
 const imageTopicPanelWidth = (s: GlobalState) => s.status.imageTopicPanelWidth;
+const videoPanelWidth = (s: GlobalState) => s.status.videoPanelWidth;
+const videoTopicPanelWidth = (s: GlobalState) => s.status.videoTopicPanelWidth;
+const showVideoPanel = (s: GlobalState) => s.status.showVideoPanel;
+const showVideoTopicPanel = (s: GlobalState) => s.status.showVideoTopicPanel;
 const wideScreen = (s: GlobalState) => !s.status.noWideScreen;
 const chatInputHeight = (s: GlobalState) => s.status.chatInputHeight || 64;
 const expandInputActionbar = (s: GlobalState) => s.status.expandInputActionbar;
@@ -42,16 +56,24 @@ const getAgentSystemRoleExpanded =
   (agentId: string) =>
   (s: GlobalState): boolean => {
     const map = s.status.systemRoleExpandedMap || {};
-    return map[agentId] === true; // 角色设定默认为折叠状态
+    return map[agentId] === true; // System role is collapsed by default
   };
 
 const disabledModelProvidersSortType = (s: GlobalState) =>
   s.status.disabledModelProvidersSortType || 'default';
 const disabledModelsSortType = (s: GlobalState) => s.status.disabledModelsSortType || 'default';
+
+const isNotificationRead =
+  (slug: string) =>
+  (s: GlobalState): boolean => {
+    const slugs = s.status.readNotificationSlugs || [];
+    return slugs.includes(slug);
+  };
 const tokenDisplayFormatShort = (s: GlobalState) =>
   s.status.tokenDisplayFormatShort !== undefined ? s.status.tokenDisplayFormatShort : true;
 
 export const systemStatusSelectors = {
+  agentBuilderPanelWidth,
   agentPageSize,
   chatInputHeight,
   disabledModelProvidersSortType,
@@ -59,16 +81,21 @@ export const systemStatusSelectors = {
   expandInputActionbar,
   filePanelWidth,
   getAgentSystemRoleExpanded,
+  groupAgentBuilderPanelWidth,
   hidePWAInstaller,
   imagePanelWidth,
   imageTopicPanelWidth,
   inZenMode,
+  isNotificationRead,
   isShowCredit,
   isStatusInit,
   language,
   leftPanelWidth,
   mobileShowPortal,
   mobileShowTopic,
+  modelSwitchPanelGroupMode,
+  modelSwitchPanelWidth,
+  pageAgentPanelWidth,
   pagePageSize,
   portalWidth,
   sessionGroupKeys,
@@ -79,10 +106,13 @@ export const systemStatusSelectors = {
   showLeftPanel,
   showRightPanel,
   showSystemRole,
+  showVideoPanel,
+  showVideoTopicPanel,
   systemStatus,
-  themeMode,
   tokenDisplayFormatShort,
   topicGroupKeys,
   topicPageSize,
+  videoPanelWidth,
+  videoTopicPanelWidth,
   wideScreen,
 };

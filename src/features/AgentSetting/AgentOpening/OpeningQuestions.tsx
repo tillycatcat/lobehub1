@@ -14,7 +14,7 @@ import { selectors } from '../store/selectors';
 const styles = createStaticStyles(({ css, cssVar }) => ({
   empty: css`
     margin-block: 24px;
-    margin-inline: 0;
+    margin-inline: auto;
   `,
   questionItemContainer: css`
     padding-block: 8px;
@@ -86,14 +86,15 @@ const OpeningQuestions = memo(() => {
   const isRepeat = openingQuestions.includes(questionInput.trim());
 
   return (
-    <Flexbox gap={8}>
-      <Flexbox gap={4}>
-        <Space.Compact>
+    <Flexbox gap={8} width={'100%'}>
+      <Flexbox gap={4} width={'100%'}>
+        <Space.Compact style={{ width: '100%' }}>
           <Input
+            placeholder={t('settingOpening.openingQuestions.placeholder')}
+            style={{ flex: 1 }}
+            value={questionInput}
             onChange={(e) => setQuestionInput(e.target.value)}
             onPressEnter={addQuestion}
-            placeholder={t('settingOpening.openingQuestions.placeholder')}
-            value={questionInput}
           />
           <Button
             // don't allow repeat
@@ -112,8 +113,7 @@ const OpeningQuestions = memo(() => {
         {openingQuestions.length > 0 ? (
           <SortableList
             items={items}
-            onChange={handleSortEnd}
-            renderItem={(item) => (
+            renderItem={(item: QuestionItem) => (
               <SortableList.Item
                 className={styles.questionItemContainer}
                 id={item.id}
@@ -123,11 +123,12 @@ const OpeningQuestions = memo(() => {
                 <div className={styles.questionItemContent}>{item.content}</div>
                 <ActionIcon
                   icon={Trash}
-                  onClick={() => removeQuestion(item.content)}
                   size={'small'}
+                  onClick={() => removeQuestion(item.content)}
                 />
               </SortableList.Item>
             )}
+            onChange={handleSortEnd}
           />
         ) : (
           <Empty

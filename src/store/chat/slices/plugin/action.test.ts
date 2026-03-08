@@ -1,13 +1,10 @@
-import {
-  DEFAULT_INBOX_AVATAR,
-  PLUGIN_SCHEMA_API_MD5_PREFIX,
-  PLUGIN_SCHEMA_SEPARATOR,
-} from '@lobechat/const';
+import { PLUGIN_SCHEMA_API_MD5_PREFIX, PLUGIN_SCHEMA_SEPARATOR } from '@lobechat/const';
 import { ToolNameResolver } from '@lobechat/context-engine';
-import { ChatToolPayload, MessageToolCall, UIChatMessage } from '@lobechat/types';
+import { type ChatToolPayload, type MessageToolCall, type UIChatMessage } from '@lobechat/types';
 import { act, renderHook } from '@testing-library/react';
 import i18n from 'i18next';
-import { Mock, afterEach, describe, expect, it, vi } from 'vitest';
+import { type Mock } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { chatService } from '@/services/chat';
 import { messageService } from '@/services/message';
@@ -381,18 +378,27 @@ describe('ChatPluginAction', () => {
   });
 
   describe('invokeBuiltinTool', () => {
-    it('should invoke the builtin tool action with parsed arguments', async () => {
+    it('should invoke Tool Store executor with parsed arguments', async () => {
       const payload = {
+        identifier: 'test-tool',
         apiName: 'mockBuiltinAction',
         arguments: JSON.stringify({ input: 'test', value: 123 }),
       } as ChatToolPayload;
 
       const messageId = 'message-id';
-      const mockActionFn = vi.fn().mockResolvedValue(undefined);
+      const mockInvokeBuiltinTool = vi.fn().mockResolvedValue({
+        content: 'result',
+        success: true,
+      });
 
-      useChatStore.setState({
-        mockBuiltinAction: mockActionFn,
-      } as any);
+      // Mock hasExecutor to return true
+      const hasExecutorModule = await import('@/store/tool/slices/builtin/executors');
+      vi.spyOn(hasExecutorModule, 'hasExecutor').mockReturnValue(true);
+
+      // Mock Tool Store's invokeBuiltinTool
+      vi.spyOn(useToolStore.getState(), 'invokeBuiltinTool').mockImplementation(
+        mockInvokeBuiltinTool,
+      );
 
       const { result } = renderHook(() => useChatStore());
 
@@ -400,52 +406,70 @@ describe('ChatPluginAction', () => {
         await result.current.invokeBuiltinTool(messageId, payload);
       });
 
-      // Verify that the builtin action was called with correct arguments
-      expect(mockActionFn).toHaveBeenCalledWith(messageId, { input: 'test', value: 123 });
+      // Verify that Tool Store's invokeBuiltinTool was called with correct arguments
+      expect(mockInvokeBuiltinTool).toHaveBeenCalledWith(
+        'test-tool',
+        'mockBuiltinAction',
+        { input: 'test', value: 123 },
+        expect.objectContaining({
+          messageId,
+        }),
+      );
     });
 
-    it('should not invoke action if apiName does not exist in store', async () => {
+    it('should not throw error if executor does not exist', async () => {
       const payload = {
+        identifier: 'non-existent-tool',
         apiName: 'nonExistentAction',
         arguments: JSON.stringify({ key: 'value' }),
       } as ChatToolPayload;
 
       const messageId = 'message-id';
 
+      // Mock hasExecutor to return false
+      const hasExecutorModule = await import('@/store/tool/slices/builtin/executors');
+      vi.spyOn(hasExecutorModule, 'hasExecutor').mockReturnValue(false);
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
       const { result } = renderHook(() => useChatStore());
 
       await act(async () => {
         await result.current.invokeBuiltinTool(messageId, payload);
       });
 
-      // Should not throw error, just return early
+      // Should log error but not throw
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('No executor found'));
+
+      consoleErrorSpy.mockRestore();
     });
 
-    it('should not invoke action if arguments cannot be parsed', async () => {
+    it('should return error result if arguments cannot be parsed', async () => {
       const payload = {
+        identifier: 'test-tool',
         apiName: 'mockBuiltinAction',
         arguments: 'invalid json',
       } as ChatToolPayload;
 
       const messageId = 'message-id';
-      const mockActionFn = vi.fn().mockResolvedValue(undefined);
-
-      useChatStore.setState({
-        mockBuiltinAction: mockActionFn,
-      } as any);
 
       const { result } = renderHook(() => useChatStore());
 
+      let returnValue: any;
       await act(async () => {
-        await result.current.invokeBuiltinTool(messageId, payload);
+        returnValue = await result.current.invokeBuiltinTool(messageId, payload);
       });
 
-      // Should not call the action if arguments can't be parsed
-      expect(mockActionFn).not.toHaveBeenCalled();
+      // Should return error result for invalid JSON
+      expect(returnValue).toEqual({ error: 'Invalid arguments', success: false });
     });
 
     describe('registerAfterCompletion with Tool Store executor', () => {
       it('should create registerAfterCompletion when root execAgentRuntime operation exists', async () => {
+        // Mock hasExecutor to return true
+        const hasExecutorModule = await import('@/store/tool/slices/builtin/executors');
+        vi.spyOn(hasExecutorModule, 'hasExecutor').mockReturnValue(true);
+
         // Setup: Create operation hierarchy
         // execAgentRuntime -> toolCalling -> executeToolCall
         const { result } = renderHook(() => useChatStore());
@@ -527,6 +551,10 @@ describe('ChatPluginAction', () => {
       });
 
       it('should not pass registerAfterCompletion when no root operation exists', async () => {
+        // Mock hasExecutor to return true
+        const hasExecutorModule = await import('@/store/tool/slices/builtin/executors');
+        vi.spyOn(hasExecutorModule, 'hasExecutor').mockReturnValue(true);
+
         const { result } = renderHook(() => useChatStore());
         const messageId = 'tool-message-id';
 
@@ -558,6 +586,10 @@ describe('ChatPluginAction', () => {
       });
 
       it('should find root operation through multiple levels of hierarchy', async () => {
+        // Mock hasExecutor to return true
+        const hasExecutorModule = await import('@/store/tool/slices/builtin/executors');
+        vi.spyOn(hasExecutorModule, 'hasExecutor').mockReturnValue(true);
+
         const { result } = renderHook(() => useChatStore());
 
         let execAgentRuntimeOpId: string;
@@ -803,7 +835,7 @@ describe('ChatPluginAction', () => {
         id: messageId,
         role: 'tool',
         content: 'Tool content',
-        plugin: { identifier: identifier, arguments: '{"oldKey":"oldValue"}' },
+        plugin: { identifier, arguments: '{"oldKey":"oldValue"}' },
         tool_call_id: toolCallId,
         parentId,
       } as UIChatMessage;
@@ -812,7 +844,7 @@ describe('ChatPluginAction', () => {
         id: parentId,
         role: 'assistant',
         content: 'Assistant content',
-        tools: [{ identifier: identifier, arguments: '{"oldKey":"oldValue"}', id: toolCallId }],
+        tools: [{ identifier, arguments: '{"oldKey":"oldValue"}', id: toolCallId }],
       } as UIChatMessage;
 
       act(() => {
@@ -1025,6 +1057,77 @@ describe('ChatPluginAction', () => {
 
       expect(transformed[0].apiName).toBe(longApiName);
     });
+
+    it('should repair malformed JSON arguments with escaped string issue', () => {
+      // This is the malformed data from haiku-4.5 model
+      // The entire JSON got stuffed into the "description" field with escaped quotes
+      const malformedArguments = JSON.stringify({
+        description:
+          'Synthesize all 10 batch analyses into 10 most important themes for product builders", "instruction": "You have access to 10 batch analysis files", "runInClient": true, "timeout": 120000}',
+      });
+
+      const toolCalls: MessageToolCall[] = [
+        {
+          id: 'tool1',
+          function: {
+            name: ['lobe-gtd', 'execTask', 'default'].join(PLUGIN_SCHEMA_SEPARATOR),
+            arguments: malformedArguments,
+          },
+          type: 'function',
+        },
+      ];
+
+      // Setup builtin tool manifest with schema that has required fields
+      act(() => {
+        useToolStore.setState({
+          builtinTools: [
+            {
+              type: 'builtin',
+              identifier: 'lobe-gtd',
+              manifest: {
+                identifier: 'lobe-gtd',
+                api: [
+                  {
+                    name: 'execTask',
+                    description: 'Execute async task',
+                    parameters: {
+                      type: 'object',
+                      required: ['description', 'instruction'],
+                      properties: {
+                        description: { type: 'string' },
+                        instruction: { type: 'string' },
+                        runInClient: { type: 'boolean' },
+                        timeout: { type: 'number' },
+                      },
+                    },
+                  },
+                ],
+                type: 'builtin',
+              } as any,
+            },
+          ],
+        });
+      });
+
+      const { result } = renderHook(() => useChatStore());
+
+      const transformed = result.current.internal_transformToolCalls(toolCalls);
+
+      // Parse the transformed arguments
+      const repairedArgs = JSON.parse(transformed[0].arguments);
+
+      // Verify all fields are correctly extracted
+      expect(repairedArgs).toHaveProperty('description');
+      expect(repairedArgs).toHaveProperty('instruction');
+      expect(repairedArgs).toHaveProperty('runInClient', true);
+      expect(repairedArgs).toHaveProperty('timeout', 120000);
+
+      // Verify description is the correct short value, not the entire malformed string
+      expect(repairedArgs.description).toBe(
+        'Synthesize all 10 batch analyses into 10 most important themes for product builders',
+      );
+      expect(repairedArgs.instruction).toBe('You have access to 10 batch analysis files');
+    });
   });
 
   describe('internal_updatePluginError', () => {
@@ -1082,7 +1185,7 @@ describe('ChatPluginAction', () => {
         id: messageId,
         role: 'assistant',
         content: 'Assistant content',
-        tools: [{ identifier: identifier, arguments: '{"oldKey":"oldValue"}', id: toolCallId }],
+        tools: [{ identifier, arguments: '{"oldKey":"oldValue"}', id: toolCallId }],
       } as UIChatMessage;
 
       act(() => {
@@ -1147,7 +1250,7 @@ describe('ChatPluginAction', () => {
         });
       });
 
-      it('should fallback to activeId/activeTopicId when context not provided', async () => {
+      it('should fallback to activeAgentId/activeTopicId when context not provided', async () => {
         const { result } = renderHook(() => useChatStore());
         const messageId = 'message-id';
         const pluginState = { key: 'value' };
@@ -1425,6 +1528,149 @@ describe('ChatPluginAction', () => {
             groupId: groupContext.groupId,
             topicId: groupContext.topicId,
           }),
+        );
+      });
+    });
+  });
+
+  describe('Plugin invoke functions use optimisticUpdateToolMessage', () => {
+    const messageId = 'message-id';
+    const payload: ChatToolPayload = {
+      apiName: 'test-api',
+      arguments: '{}',
+      id: 'tool-call-id',
+      identifier: 'test-plugin',
+      type: 'default',
+    };
+
+    describe('invokeMCPTypePlugin', () => {
+      it('should use optimisticUpdateToolMessage for successful result', async () => {
+        const mockResult = {
+          content: 'mcp result content',
+          state: { content: [], isError: false },
+          success: true,
+        };
+
+        // Mock the mcpService
+        const mcpService = await import('@/services/mcp');
+        vi.spyOn(mcpService.mcpService, 'invokeMcpToolCall').mockResolvedValue(mockResult);
+
+        const optimisticUpdateToolMessageMock = vi.fn().mockResolvedValue(undefined);
+
+        act(() => {
+          useChatStore.setState({
+            activeAgentId: 'session-id',
+            messagesMap: { [messageMapKey({ agentId: 'session-id' })]: [] },
+            optimisticUpdateToolMessage: optimisticUpdateToolMessageMock,
+            replaceMessages: vi.fn(),
+            messageOperationMap: {},
+            operations: {},
+          });
+        });
+
+        const { result } = renderHook(() => useChatStore());
+
+        await act(async () => {
+          await result.current.invokeMCPTypePlugin(messageId, payload);
+        });
+
+        expect(optimisticUpdateToolMessageMock).toHaveBeenCalledWith(
+          messageId,
+          {
+            content: mockResult.content,
+            pluginError: undefined,
+            pluginState: mockResult.state,
+          },
+          undefined,
+        );
+      });
+
+      it('should use optimisticUpdateToolMessage for error result', async () => {
+        const mockResult = {
+          content: 'error content',
+          error: { message: 'test error' },
+          state: { content: [], isError: true },
+          success: false,
+        };
+
+        const mcpService = await import('@/services/mcp');
+        vi.spyOn(mcpService.mcpService, 'invokeMcpToolCall').mockResolvedValue(mockResult);
+
+        const optimisticUpdateToolMessageMock = vi.fn().mockResolvedValue(undefined);
+
+        act(() => {
+          useChatStore.setState({
+            activeAgentId: 'session-id',
+            messagesMap: { [messageMapKey({ agentId: 'session-id' })]: [] },
+            optimisticUpdateToolMessage: optimisticUpdateToolMessageMock,
+            replaceMessages: vi.fn(),
+            messageOperationMap: {},
+            operations: {},
+          });
+        });
+
+        const { result } = renderHook(() => useChatStore());
+
+        await act(async () => {
+          await result.current.invokeMCPTypePlugin(messageId, payload);
+        });
+
+        expect(optimisticUpdateToolMessageMock).toHaveBeenCalledWith(
+          messageId,
+          {
+            content: mockResult.content,
+            pluginError: mockResult.error,
+            pluginState: undefined,
+          },
+          undefined,
+        );
+      });
+    });
+
+    describe('invokeKlavisTypePlugin', () => {
+      it('should use optimisticUpdateToolMessage for successful result', async () => {
+        const mockResult = {
+          content: 'klavis result content',
+          state: { data: 'test-data' },
+          success: true,
+        };
+
+        // Mock useToolStore to return a server
+        vi.spyOn(useToolStore, 'getState').mockReturnValue({
+          servers: [{ identifier: 'test-plugin', serverUrl: 'http://test.com' }],
+          callKlavisTool: vi.fn().mockResolvedValue({
+            success: true,
+            data: mockResult,
+          }),
+        } as any);
+
+        const optimisticUpdateToolMessageMock = vi.fn().mockResolvedValue(undefined);
+
+        act(() => {
+          useChatStore.setState({
+            activeAgentId: 'session-id',
+            messagesMap: { [messageMapKey({ agentId: 'session-id' })]: [] },
+            optimisticUpdateToolMessage: optimisticUpdateToolMessageMock,
+            replaceMessages: vi.fn(),
+            messageOperationMap: {},
+            operations: {},
+          });
+        });
+
+        const { result } = renderHook(() => useChatStore());
+
+        await act(async () => {
+          await result.current.invokeKlavisTypePlugin(messageId, payload);
+        });
+
+        expect(optimisticUpdateToolMessageMock).toHaveBeenCalledWith(
+          messageId,
+          {
+            content: mockResult.content,
+            pluginError: undefined,
+            pluginState: mockResult.state,
+          },
+          undefined,
         );
       });
     });

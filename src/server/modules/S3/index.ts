@@ -2,15 +2,16 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import mime from 'mime';
 import { z } from 'zod';
 
 import { fileEnv } from '@/envs/file';
 import { YEAR } from '@/utils/units';
-import { inferContentTypeFromImageUrl } from '@/utils/url';
 
 export const fileSchema = z.object({
   Key: z.string(),
@@ -51,10 +52,10 @@ export class S3 {
 
     this.client = new S3Client({
       credentials: {
-        accessKeyId: accessKeyId,
-        secretAccessKey: secretAccessKey,
+        accessKeyId,
+        secretAccessKey,
       },
-      endpoint: endpoint,
+      endpoint,
       forcePathStyle: options?.forcePathStyle,
       region: options?.region || DEFAULT_S3_REGION,
       // refs: https://github.com/lobehub/lobe-chat/pull/5479
@@ -111,6 +112,26 @@ export class S3 {
     return response.Body.transformToByteArray();
   }
 
+  /**
+   * Get file metadata from S3 using HeadObject
+   * This is used to verify actual file size from S3 instead of trusting client-provided values
+   */
+  public async getFileMetadata(
+    key: string,
+  ): Promise<{ contentLength: number; contentType?: string }> {
+    const command = new HeadObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+
+    const response = await this.client.send(command);
+
+    return {
+      contentLength: response.ContentLength ?? 0,
+      contentType: response.ContentType,
+    };
+  }
+
   public async createPreSignedUrl(key: string): Promise<string> {
     const command = new PutObjectCommand({
       ACL: this.setAcl ? 'public-read' : undefined,
@@ -132,12 +153,20 @@ export class S3 {
     });
   }
 
-  // 添加一个新方法用于上传二进制内容
-  public async uploadBuffer(path: string, buffer: Buffer, contentType?: string) {
+  /**
+   * Upload buffer with specified content type
+   */
+  public async uploadBuffer(
+    path: string,
+    buffer: Buffer,
+    contentType?: string,
+    cacheControl?: string,
+  ) {
     const command = new PutObjectCommand({
       ACL: this.setAcl ? 'public-read' : undefined,
       Body: buffer,
       Bucket: this.bucket,
+      CacheControl: cacheControl,
       ContentType: contentType,
       Key: path,
     });
@@ -156,13 +185,17 @@ export class S3 {
     return this.client.send(command);
   }
 
+  /**
+   * Upload media file (images only) with long-term cache
+   */
   public async uploadMedia(key: string, buffer: Buffer) {
+    const contentType = mime.getType(key) || 'application/octet-stream';
     const command = new PutObjectCommand({
       ACL: this.setAcl ? 'public-read' : undefined,
       Body: buffer,
       Bucket: this.bucket,
       CacheControl: `public, max-age=${YEAR}`,
-      ContentType: inferContentTypeFromImageUrl(key)!,
+      ContentType: contentType,
       Key: key,
     });
 

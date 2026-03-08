@@ -1,4 +1,4 @@
-import { AIChatModelCard } from '../types/aiModel';
+import type { AIChatModelCard } from '../types/aiModel';
 
 const zenmuxChatModels: AIChatModelCard[] = [
   {
@@ -21,7 +21,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
       'GPT-5.2 is a flagship model for coding and agentic workflows with stronger reasoning and long-context performance.',
     displayName: 'GPT-5.2',
     enabled: true,
-    id: 'gpt-5.2',
+    id: 'openai/gpt-5.2',
     maxOutput: 128_000,
     pricing: {
       units: [
@@ -32,7 +32,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
     },
     releasedAt: '2025-12-11',
     settings: {
-      extendParams: ['gpt5_1ReasoningEffort', 'textVerbosity'],
+      extendParams: ['gpt5_2ReasoningEffort', 'textVerbosity'],
       searchImpl: 'params',
     },
     type: 'chat',
@@ -48,7 +48,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
     description:
       'GPT-5.2 Pro: a smarter, more precise GPT-5.2 variant (Responses API only), suited for harder problems and longer multi-turn reasoning.',
     displayName: 'GPT-5.2 pro',
-    id: 'gpt-5.2-pro',
+    id: 'openai/gpt-5.2-pro',
     maxOutput: 128_000,
     pricing: {
       units: [
@@ -69,10 +69,10 @@ const zenmuxChatModels: AIChatModelCard[] = [
     },
     contextWindowTokens: 128_000,
     description:
-      'GPT-5.2 Chat is the ChatGPT variant (chat-latest) for experiencing the newest conversation improvements.',
+      'GPT-5.2 Chat is the ChatGPT variant for experiencing the newest conversation improvements.',
     displayName: 'GPT-5.2 Chat',
     enabled: true,
-    id: 'gpt-5.2-chat-latest',
+    id: 'openai/gpt-5.2-chat',
     maxOutput: 16_384,
     pricing: {
       units: [
@@ -110,27 +110,6 @@ const zenmuxChatModels: AIChatModelCard[] = [
   {
     abilities: {
       functionCall: true,
-      imageOutput: true,
-      reasoning: true,
-      vision: true,
-    },
-    contextWindowTokens: 65_536,
-    description: 'Gemini 3 Pro Image free tier with limited-quota multimodal generation.',
-    displayName: 'Gemini 3 Pro Image (Nano Banana) Free',
-    enabled: true,
-    id: 'google/gemini-3-pro-image-preview-free',
-    maxOutput: 32_768,
-    pricing: {
-      units: [
-        { name: 'textInput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-        { name: 'textOutput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-      ],
-    },
-    type: 'chat',
-  },
-  {
-    abilities: {
-      functionCall: true,
       reasoning: true,
       vision: true,
     },
@@ -147,30 +126,8 @@ const zenmuxChatModels: AIChatModelCard[] = [
       ],
     },
     releasedAt: '2025-11-20',
-    type: 'chat',
-  },
-  {
-    abilities: {
-      functionCall: true,
-      reasoning: true,
-      search: true,
-      vision: true,
-    },
-    contextWindowTokens: 1_050_000,
-    description:
-      'Gemini 3 Pro Preview Free offers the same multimodal understanding and reasoning as the standard version, but with quota and rate limits, making it better for trials and low-frequency use.',
-    displayName: 'Gemini 3 Pro Preview Free',
-    enabled: true,
-    id: 'google/gemini-3-pro-preview-free',
-    maxOutput: 65_530,
-    pricing: {
-      units: [
-        { name: 'textInput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-        { name: 'textOutput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-      ],
-    },
     settings: {
-      extendParams: ['thinkingLevel', 'urlContext'],
+      extendParams: ['thinkingLevel2', 'urlContext'],
       searchImpl: 'params',
       searchProvider: 'google',
     },
@@ -348,7 +305,8 @@ const zenmuxChatModels: AIChatModelCard[] = [
       reasoning: true,
     },
     contextWindowTokens: 256_000,
-    description: "Grok 4 is xAI's flagship reasoning model with strong reasoning and multimodal capability.",
+    description:
+      "Grok 4 is xAI's flagship reasoning model with strong reasoning and multimodal capability.",
     displayName: 'Grok 4',
     id: 'x-ai/grok-4',
     maxOutput: 256_000,
@@ -645,7 +603,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
   },
   {
     abilities: {
-      reasoning: true,
+      functionCall: true,
     },
     contextWindowTokens: 128_000,
     description:
@@ -707,7 +665,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
     },
     contextWindowTokens: 1_050_000,
     description:
-      "Gemini 2.5 Pro is Google’s flagship reasoning model with long context support for complex tasks.",
+      'Gemini 2.5 Pro is Google’s flagship reasoning model with long context support for complex tasks.',
     displayName: 'Gemini 2.5 Pro',
     id: 'google/gemini-2.5-pro',
     maxOutput: 65_530,
@@ -733,33 +691,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
     },
     contextWindowTokens: 1_050_000,
     description:
-      'Gemini 2.5 Pro free tier offers limited-quota multimodal long-context, suitable for trials and light workflows.',
-    displayName: 'Gemini 2.5 Pro Free',
-    id: 'google/gemini-2.5-pro-free',
-    maxOutput: 65_530,
-    pricing: {
-      units: [
-        { name: 'textInput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-        { name: 'textOutput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-      ],
-    },
-    settings: {
-      extendParams: ['thinkingBudget', 'urlContext'],
-      searchImpl: 'params',
-      searchProvider: 'google',
-    },
-    type: 'chat',
-  },
-  {
-    abilities: {
-      functionCall: true,
-      reasoning: true,
-      search: true,
-      vision: true,
-    },
-    contextWindowTokens: 1_050_000,
-    description:
-      "Gemini 2.5 Flash (Lite/Pro/Flash) is Google’s family spanning low latency to high-performance reasoning.",
+      'Gemini 2.5 Flash is Google’s family spanning low latency to high-performance reasoning.',
     displayName: 'Gemini 2.5 Flash',
     id: 'google/gemini-2.5-flash',
     maxOutput: 65_530,
@@ -931,8 +863,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
       reasoning: true,
     },
     contextWindowTokens: 1_050_000,
-    description:
-      'GPT-4.1 Mini offers lower latency and better value for mid-context workloads.',
+    description: 'GPT-4.1 Mini offers lower latency and better value for mid-context workloads.',
     displayName: 'GPT-4.1 Mini',
     id: 'openai/gpt-4.1-mini',
     maxOutput: 32_770,
@@ -1076,7 +1007,8 @@ const zenmuxChatModels: AIChatModelCard[] = [
       reasoning: true,
     },
     contextWindowTokens: 200_000,
-    description: "GLM 4.6 is Z.AI's flagship model with extended context length and coding capability.",
+    description:
+      "GLM 4.6 is Z.AI's flagship model with extended context length and coding capability.",
     displayName: 'GLM 4.6',
     id: 'z-ai/glm-4.6',
     maxOutput: 128_000,
@@ -1125,7 +1057,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
     },
     contextWindowTokens: 200_000,
     description:
-      "Opus 4.1 is Anthropic’s high-end model optimized for programming, complex reasoning, and long-running tasks.",
+      'Opus 4.1 is Anthropic’s high-end model optimized for programming, complex reasoning, and long-running tasks.',
     displayName: 'Claude Opus 4.1',
     id: 'anthropic/claude-opus-4.1',
     maxOutput: 32_000,
@@ -1150,7 +1082,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
     },
     contextWindowTokens: 200_000,
     description:
-      "Opus 4 is Anthropic’s flagship model designed for complex tasks and enterprise applications.",
+      'Opus 4 is Anthropic’s flagship model designed for complex tasks and enterprise applications.',
     displayName: 'Claude Opus 4',
     id: 'anthropic/claude-opus-4',
     maxOutput: 32_000,
@@ -1192,33 +1124,13 @@ const zenmuxChatModels: AIChatModelCard[] = [
   {
     abilities: {
       functionCall: true,
-      imageOutput: true,
-      reasoning: true,
-      vision: true,
-    },
-    contextWindowTokens: 32_768,
-    description: 'Gemini 2.5 Flash Image free tier with limited-quota multimodal generation.',
-    displayName: 'Gemini 2.5 Flash Image (Nano Banana) Free',
-    id: 'google/gemini-2.5-flash-image-free',
-    maxOutput: 8192,
-    pricing: {
-      units: [
-        { name: 'textInput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-        { name: 'textOutput', rate: 0, strategy: 'fixed', unit: 'millionTokens' },
-      ],
-    },
-    type: 'chat',
-  },
-  {
-    abilities: {
-      functionCall: true,
       reasoning: true,
       search: true,
       vision: true,
     },
     contextWindowTokens: 200_000,
     description:
-      "Claude Sonnet 4.5 is Anthropic’s latest hybrid reasoning model optimized for complex reasoning and coding.",
+      'Claude Sonnet 4.5 is Anthropic’s latest hybrid reasoning model optimized for complex reasoning and coding.',
     displayName: 'Claude Sonnet 4.5',
     id: 'anthropic/claude-sonnet-4.5',
     maxOutput: 64_000,
@@ -1259,7 +1171,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
       reasoning: true,
     },
     contextWindowTokens: 200_000,
-    description: "OpenAI o4-mini is a small, efficient reasoning model for low-latency scenarios.",
+    description: 'OpenAI o4-mini is a small, efficient reasoning model for low-latency scenarios.',
     displayName: 'o4 Mini',
     id: 'openai/o4-mini',
     maxOutput: 100_000,
@@ -1542,7 +1454,7 @@ const zenmuxChatModels: AIChatModelCard[] = [
     abilities: { reasoning: true },
     contextWindowTokens: 128_000,
     description:
-      "GLM 4.5 is Z.AI’s flagship model with hybrid reasoning optimized for engineering and long-context tasks.",
+      'GLM 4.5 is Z.AI’s flagship model with hybrid reasoning optimized for engineering and long-context tasks.',
     displayName: 'GLM 4.5',
     id: 'z-ai/glm-4.5',
     maxOutput: 96_000,

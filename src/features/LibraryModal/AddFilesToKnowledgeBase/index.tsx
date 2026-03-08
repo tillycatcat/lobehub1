@@ -1,9 +1,7 @@
-import { Flexbox, Icon } from '@lobehub/ui';
+import { createModal, Flexbox, Icon, useModalContext } from '@lobehub/ui';
 import { BookUp2Icon } from 'lucide-react';
-import { Suspense, memo } from 'react';
+import { memo, Suspense, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { createModal } from '@/components/FunctionModal';
 
 import SelectForm from './SelectForm';
 
@@ -16,20 +14,19 @@ interface AddFilesToKnowledgeBaseModalProps {
 interface ModalContentProps {
   fileIds: string[];
   knowledgeBaseId?: string;
-  onClose?: () => void;
 }
 
-const ModalContent = memo<ModalContentProps>(({ fileIds, knowledgeBaseId, onClose }) => {
+const ModalContent = memo<ModalContentProps>(({ fileIds, knowledgeBaseId }) => {
   const { t } = useTranslation('knowledgeBase');
-
+  const { close } = useModalContext();
   return (
     <>
-      <Flexbox gap={8} horizontal paddingBlock={16} paddingInline={16} style={{ paddingBottom: 0 }}>
+      <Flexbox horizontal gap={8} paddingBlock={16} paddingInline={16} style={{ paddingBottom: 0 }}>
         <Icon icon={BookUp2Icon} />
         {t('addToKnowledgeBase.title')}
       </Flexbox>
       <Flexbox padding={16} style={{ paddingTop: 0 }}>
-        <SelectForm fileIds={fileIds} knowledgeBaseId={knowledgeBaseId} onClose={onClose} />
+        <SelectForm fileIds={fileIds} knowledgeBaseId={knowledgeBaseId} onClose={close} />
       </Flexbox>
     </>
   );
@@ -37,19 +34,19 @@ const ModalContent = memo<ModalContentProps>(({ fileIds, knowledgeBaseId, onClos
 
 ModalContent.displayName = 'AddFilesToKnowledgeBaseModalContent';
 
-export const useAddFilesToKnowledgeBaseModal = createModal<AddFilesToKnowledgeBaseModalProps>(
-  (instance, params) => ({
-    content: (
-      <Suspense fallback={<div style={{ minHeight: 200 }} />}>
-        <ModalContent
-          fileIds={params?.fileIds || []}
-          knowledgeBaseId={params?.knowledgeBaseId}
-          onClose={() => {
-            instance.current?.destroy();
-            params?.onClose?.();
-          }}
-        />
-      </Suspense>
-    ),
-  }),
-);
+export const useAddFilesToKnowledgeBaseModal = () => {
+  const open = useCallback((params?: AddFilesToKnowledgeBaseModalProps) => {
+    createModal({
+      afterClose: params?.onClose,
+      children: (
+        <Suspense fallback={<div style={{ minHeight: 200 }} />}>
+          <ModalContent fileIds={params?.fileIds || []} knowledgeBaseId={params?.knowledgeBaseId} />
+        </Suspense>
+      ),
+      footer: null,
+      title: null,
+    });
+  }, []);
+
+  return { open };
+};

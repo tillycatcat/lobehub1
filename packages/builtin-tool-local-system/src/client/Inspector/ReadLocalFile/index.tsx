@@ -1,79 +1,63 @@
 'use client';
 
-import { type LocalReadFileParams } from '@lobechat/electron-client-ipc';
-import { type BuiltinInspectorProps } from '@lobechat/types';
-import { createStaticStyles, cssVar, cx } from 'antd-style';
-import { Check, X } from 'lucide-react';
-import path from 'path-browserify-esm';
-import { memo } from 'react';
+import type { LocalReadFileParams } from '@lobechat/electron-client-ipc';
+import type { BuiltinInspectorProps } from '@lobechat/types';
+import { createStaticStyles, cx } from 'antd-style';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { highlightTextStyles, shinyTextStyles } from '@/styles';
+import { inspectorTextStyles, shinyTextStyles } from '@/styles';
 
-import { type LocalReadFileState } from '../../..';
+import type { LocalReadFileState } from '../../..';
+import { FilePathDisplay } from '../../components/FilePathDisplay';
 
-const styles = createStaticStyles(({ css, cssVar }) => ({
-  root: css`
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-
-    color: ${cssVar.colorTextSecondary};
-  `,
-  statusIcon: css`
-    margin-block-end: -2px;
+const styles = createStaticStyles(({ css }) => ({
+  lineRange: css`
+    flex-shrink: 0;
     margin-inline-start: 4px;
+    font-size: 12px;
+    opacity: 0.7;
   `,
 }));
 
 export const ReadLocalFileInspector = memo<
   BuiltinInspectorProps<LocalReadFileParams, LocalReadFileState>
->(({ args, partialArgs, isArgumentsStreaming, pluginState, isLoading }) => {
+>(({ args, partialArgs, isArgumentsStreaming, isLoading }) => {
   const { t } = useTranslation('plugin');
 
-  // Show filename with parent directory for context
   const filePath = args?.path || partialArgs?.path || '';
-  let displayPath = '';
-  if (filePath) {
-    const { base, dir } = path.parse(filePath);
-    const parentDir = path.basename(dir);
-    displayPath = parentDir ? `${parentDir}/${base}` : base;
-  }
+  const loc = args?.loc || partialArgs?.loc;
+
+  // Format line range display, e.g., "L1-L200"
+  const lineRangeText = useMemo(() => {
+    if (!loc || loc.length !== 2) return null;
+    const [start, end] = loc;
+    return `L${start + 1}-L${end}`;
+  }, [loc]);
 
   // During argument streaming
   if (isArgumentsStreaming) {
-    if (!displayPath)
+    if (!filePath)
       return (
-        <div className={cx(styles.root, shinyTextStyles.shinyText)}>
+        <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
           <span>{t('builtins.lobe-local-system.apiName.readLocalFile')}</span>
         </div>
       );
 
     return (
-      <div className={cx(styles.root, shinyTextStyles.shinyText)}>
+      <div className={cx(inspectorTextStyles.root, shinyTextStyles.shinyText)}>
         <span>{t('builtins.lobe-local-system.apiName.readLocalFile')}: </span>
-        <span className={highlightTextStyles.primary}>{displayPath}</span>
+        <FilePathDisplay filePath={filePath} />
+        {lineRangeText && <span className={styles.lineRange}>{lineRangeText}</span>}
       </div>
     );
   }
 
-  // Check if file was read successfully (has content)
-  const hasContent = !!pluginState?.fileContent;
-
   return (
-    <div className={cx(styles.root, isLoading && shinyTextStyles.shinyText)}>
-      <span style={{ marginInlineStart: 2 }}>
-        <span>{t('builtins.lobe-local-system.apiName.readLocalFile')}: </span>
-        {displayPath && <span className={highlightTextStyles.primary}>{displayPath}</span>}
-        {isLoading ? null : pluginState ? (
-          hasContent ? (
-            <Check className={styles.statusIcon} color={cssVar.colorSuccess} size={14} />
-          ) : (
-            <X className={styles.statusIcon} color={cssVar.colorError} size={14} />
-          )
-        ) : null}
-      </span>
+    <div className={cx(inspectorTextStyles.root, isLoading && shinyTextStyles.shinyText)}>
+      <span>{t('builtins.lobe-local-system.apiName.readLocalFile')}: </span>
+      <FilePathDisplay filePath={filePath} />
+      {lineRangeText && <span className={styles.lineRange}>{lineRangeText}</span>}
     </div>
   );
 });

@@ -1,18 +1,12 @@
 import { createStaticStyles } from 'antd-style';
 
 export const styles = createStaticStyles(({ css, cssVar }) => ({
-  
-  
-// Divider 样式
-divider: css`
+  divider: css`
     height: 24px;
   `,
 
-  
-  
-
-// 内层容器 - 深色模式
-innerContainerDark: css`
+  // 内层容器 - 深色模式
+  innerContainerDark: css`
     position: relative;
 
     overflow: hidden;
@@ -23,11 +17,8 @@ innerContainerDark: css`
     background: ${cssVar.colorBgContainer};
   `,
 
-  
-  
-
-// 内层容器 - 浅色模式
-innerContainerLight: css`
+  // 内层容器 - 浅色模式
+  innerContainerLight: css`
     position: relative;
 
     overflow: hidden;
@@ -38,10 +29,8 @@ innerContainerLight: css`
     background: ${cssVar.colorBgContainer};
   `,
 
-  
-  
-// 外层容器
-outerContainer: css`
+  // 外层容器
+  outerContainer: css`
     position: relative;
   `,
 }));

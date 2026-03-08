@@ -1,9 +1,9 @@
-import { Icon } from '@lobehub/ui';
-import { Dropdown } from 'antd';
-import type { MenuProps } from 'antd';
-import { Grid3x3Icon, ListIcon } from 'lucide-react';
+import { DropdownMenu, Icon } from '@lobehub/ui';
+import { Check, Grid3x3Icon, ListIcon } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { type MenuProps } from '@/components/Menu';
 
 import { useViewMode } from '../hooks/useViewMode';
 import ActionIconWithChevron from './ActionIconWithChevron';
@@ -20,31 +20,30 @@ const ViewSwitcher = memo(() => {
   const currentViewLabel =
     viewMode === 'list' ? t('FileManager.view.list') : t('FileManager.view.masonry');
 
-  const menuItems = useMemo<MenuProps['items']>(() => {
-    return [
+  const menuItems: MenuProps['items'] = useMemo(
+    () => [
       {
+        extra: viewMode === 'list' ? <Icon icon={Check} /> : undefined,
         icon: <Icon icon={ListIcon} />,
         key: 'list',
         label: t('FileManager.view.list'),
         onClick: () => setViewMode('list'),
       },
       {
+        extra: viewMode === 'masonry' ? <Icon icon={Check} /> : undefined,
         icon: <Icon icon={Grid3x3Icon} />,
         key: 'masonry',
         label: t('FileManager.view.masonry'),
         onClick: () => setViewMode('masonry'),
       },
-    ];
-  }, [setViewMode, t]);
+    ],
+    [setViewMode, t, viewMode],
+  );
 
   return (
-    <Dropdown
-      menu={{ items: menuItems, selectedKeys: [viewMode] }}
-      placement="bottomRight"
-      trigger={['click']}
-    >
+    <DropdownMenu items={menuItems} placement="bottomRight">
       <ActionIconWithChevron icon={currentViewIcon} title={currentViewLabel} />
-    </Dropdown>
+    </DropdownMenu>
   );
 });
 
