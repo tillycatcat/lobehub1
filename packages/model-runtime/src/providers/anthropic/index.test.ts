@@ -1,9 +1,10 @@
 // @vitest-environment node
-import { Mock, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildDefaultAnthropicPayload } from '../../core/anthropicCompatibleFactory';
 import * as anthropicHelpers from '../../core/contextBuilders/anthropic';
-import { ChatCompletionTool, ChatStreamPayload } from '../../types/chat';
+import type { ChatCompletionTool, ChatStreamPayload } from '../../types/chat';
 import * as debugStreamModule from '../../utils/debugStream';
 import { LobeAnthropicAI } from './index';
 
@@ -13,7 +14,7 @@ const bizErrorType = 'ProviderBizError';
 const invalidErrorType = 'InvalidProviderAPIKey';
 
 // Mock the console.error to avoid polluting test output
-vi.spyOn(console, 'error').mockImplementation(() => { });
+vi.spyOn(console, 'error').mockImplementation(() => {});
 
 let instance: InstanceType<typeof LobeAnthropicAI>;
 
@@ -123,7 +124,7 @@ describe('LobeAnthropicAI', () => {
           { content: 'You are an awesome greeter', role: 'system' },
           { content: 'Hello', role: 'user' },
         ],
-        model: 'claude-3-7-sonnet-20250219',
+        model: 'claude-sonnet-4-5-20250929',
         temperature: 0,
       });
 
@@ -137,7 +138,7 @@ describe('LobeAnthropicAI', () => {
               role: 'user',
             },
           ],
-          model: 'claude-3-7-sonnet-20250219',
+          model: 'claude-sonnet-4-5-20250929',
           stream: true,
           system: [
             {
@@ -844,7 +845,7 @@ describe('LobeAnthropicAI', () => {
         const payload: ChatStreamPayload = {
           messages: [{ content: 'Hello', role: 'user' }],
           model: 'claude-3-haiku-20240307',
-          temperature: 1.0,
+          temperature: 1,
         };
 
         const result = await buildDefaultAnthropicPayload(payload);
