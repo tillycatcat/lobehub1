@@ -69,7 +69,7 @@ export class Discord implements PlatformBot {
     const durationMs = options?.durationMs ?? DEFAULT_DURATION_MS;
     const waitUntil = options?.waitUntil ?? ((task: Promise<any>) => task.catch(() => {}));
 
-    const webhookUrl = `${appEnv.APP_URL}/api/agent/webhooks/discord`;
+    const webhookUrl = `${(appEnv.APP_URL || '').trim()}/api/agent/webhooks/discord`;
 
     await discordAdapter.startGatewayListener(
       { waitUntil },

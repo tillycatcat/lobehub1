@@ -39,6 +39,7 @@ export const getTelegramFormItems = (
           desc: t('channel.devWebhookProxyUrlHint'),
           label: t('channel.devWebhookProxyUrl'),
           name: 'webhookProxyUrl',
+          rules: [{ type: 'url' as const }],
         },
       ] as FormItemProps[])
     : []),
