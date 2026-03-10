@@ -123,7 +123,7 @@ const RuntimeEnv = memo(() => {
   // Skeleton placeholder to prevent layout jump during loading
   if (!agentId || isLoading) {
     return (
-      <Flexbox horizontal align={'center'} className={styles.bar} justify={'space-between'}>
+      <Flexbox horizontal align={'center'} className={styles.bar} gap={4}>
         <Skeleton.Button active size="small" style={{ height: 22, minWidth: 64, width: 64 }} />
         <Skeleton.Button active size="small" style={{ height: 22, minWidth: 100, width: 100 }} />
       </Flexbox>
@@ -228,15 +228,11 @@ const RuntimeEnv = memo(() => {
       );
     }
 
-    if (runtimeMode === 'cloud') {
-      return <span className={styles.modeDesc}>{t('runtimeEnv.mode.cloudDesc')}</span>;
-    }
-
-    return <span className={styles.modeDesc}>{t('runtimeEnv.mode.noneDesc')}</span>;
+    return null;
   };
 
   return (
-    <Flexbox horizontal align={'center'} className={styles.bar} justify={'space-between'}>
+    <Flexbox horizontal align={'center'} className={styles.bar} gap={4}>
       {/* Left: Mode selector */}
       <Popover
         content={modeContent}
