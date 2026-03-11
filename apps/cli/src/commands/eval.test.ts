@@ -485,12 +485,12 @@ describe('eval command', () => {
   // ============================================
   // Internal Run tests
   // ============================================
-  describe('irun', () => {
+  describe('run', () => {
     it('should list runs', async () => {
       mockTrpcClient.agentEval.listRuns.query.mockResolvedValue({ data: [], total: 0 });
 
       const program = createProgram();
-      await program.parseAsync(['node', 'test', 'eval', 'irun', 'list', '--json']);
+      await program.parseAsync(['node', 'test', 'eval', 'run', 'list', '--json']);
 
       expect(mockTrpcClient.agentEval.listRuns.query).toHaveBeenCalled();
     });
@@ -503,7 +503,7 @@ describe('eval command', () => {
         'node',
         'test',
         'eval',
-        'irun',
+        'run',
         'create',
         '--dataset-id',
         'd1',
@@ -521,7 +521,7 @@ describe('eval command', () => {
       mockTrpcClient.agentEval.startRun.mutate.mockResolvedValue({ success: true, runId: 'r1' });
 
       const program = createProgram();
-      await program.parseAsync(['node', 'test', 'eval', 'irun', 'start', '--id', 'r1']);
+      await program.parseAsync(['node', 'test', 'eval', 'run', 'start', '--id', 'r1']);
 
       expect(mockTrpcClient.agentEval.startRun.mutate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'r1' }),
@@ -532,7 +532,7 @@ describe('eval command', () => {
       mockTrpcClient.agentEval.abortRun.mutate.mockResolvedValue({ success: true });
 
       const program = createProgram();
-      await program.parseAsync(['node', 'test', 'eval', 'irun', 'abort', '--id', 'r1']);
+      await program.parseAsync(['node', 'test', 'eval', 'run', 'abort', '--id', 'r1']);
 
       expect(mockTrpcClient.agentEval.abortRun.mutate).toHaveBeenCalledWith({ id: 'r1' });
     });
@@ -541,16 +541,7 @@ describe('eval command', () => {
       mockTrpcClient.agentEval.getRunProgress.query.mockResolvedValue({ status: 'running' });
 
       const program = createProgram();
-      await program.parseAsync([
-        'node',
-        'test',
-        'eval',
-        'irun',
-        'progress',
-        '--id',
-        'r1',
-        '--json',
-      ]);
+      await program.parseAsync(['node', 'test', 'eval', 'run', 'progress', '--id', 'r1', '--json']);
 
       expect(mockTrpcClient.agentEval.getRunProgress.query).toHaveBeenCalledWith({ id: 'r1' });
     });
@@ -563,7 +554,7 @@ describe('eval command', () => {
       });
 
       const program = createProgram();
-      await program.parseAsync(['node', 'test', 'eval', 'irun', 'results', '--id', 'r1', '--json']);
+      await program.parseAsync(['node', 'test', 'eval', 'run', 'results', '--id', 'r1', '--json']);
 
       expect(mockTrpcClient.agentEval.getRunResults.query).toHaveBeenCalledWith({ id: 'r1' });
     });
@@ -572,7 +563,7 @@ describe('eval command', () => {
       mockTrpcClient.agentEval.deleteRun.mutate.mockResolvedValue({ success: true });
 
       const program = createProgram();
-      await program.parseAsync(['node', 'test', 'eval', 'irun', 'delete', '--id', 'r1']);
+      await program.parseAsync(['node', 'test', 'eval', 'run', 'delete', '--id', 'r1']);
 
       expect(mockTrpcClient.agentEval.deleteRun.mutate).toHaveBeenCalledWith({ id: 'r1' });
     });

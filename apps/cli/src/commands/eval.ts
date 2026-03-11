@@ -532,7 +532,7 @@ export function registerEvalCommand(program: Command) {
   // ============================================
   // Internal Run Operations
   // ============================================
-  const iRunCmd = evalCmd.command('irun').description('Manage internal evaluation runs');
+  const iRunCmd = evalCmd.command('run').description('Manage evaluation runs');
 
   iRunCmd
     .command('list')
