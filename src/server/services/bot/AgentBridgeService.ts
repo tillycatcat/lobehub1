@@ -148,7 +148,8 @@ export class AgentBridgeService {
     // Discord thread ID format: "discord:guild:channel[:thread]" — the 4th segment is present
     // only when the message is inside a Discord thread.
     const isDiscordTopLevelChannel =
-      botContext?.platform === 'discord' && !thread.adapter.decodeThreadId(thread.id).threadId;
+      botContext?.platform === 'discord' &&
+      !(thread.adapter.decodeThreadId(thread.id) as { threadId?: string }).threadId;
     if (!isDiscordTopLevelChannel) {
       await thread.subscribe();
     }
@@ -178,7 +179,7 @@ export class AgentBridgeService {
 
       // Persist topic mapping and channel context in thread state for follow-up messages
       // Skip for non-threaded Discord channels (no subscribe = no follow-up)
-      if (topicId && !isDiscordChannel) {
+      if (topicId && !isDiscordTopLevelChannel) {
         await thread.setState({ channelContext, topicId });
         log('handleMention: stored topicId=%s in thread=%s state', topicId, thread.id);
       }
