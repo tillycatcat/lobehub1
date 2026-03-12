@@ -23,6 +23,24 @@ const resolveNextPort = (): number => {
   return 3010;
 };
 
+/**
+ * Parse the Vite dev port from the given spa script (e.g. dev:spa or dev:spa:mobile).
+ * Supports both `--port <n>` and `-p <n>` flags. Falls back to 9876.
+ */
+const resolveVitePort = (scriptName: string): number => {
+  try {
+    const pkg = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf-8'));
+    const script: string | undefined = pkg?.scripts?.[scriptName];
+    if (script) {
+      const match = script.match(/(?:--port|-p)\s+(\d+)/);
+      if (match) return Number(match[1]);
+    }
+  } catch {
+    /* fallback */
+  }
+  return 9876;
+};
+
 const NEXT_PORT = resolveNextPort();
 const NEXT_ROOT_URL = `http://${NEXT_HOST}:${NEXT_PORT}/`;
 const NEXT_READY_TIMEOUT_MS = 180_000;
@@ -116,14 +134,23 @@ const watchChildExit = (child: ChildProcess, name: 'next' | 'vite') => {
   });
 };
 
+const isMobile =
+  process.env.MOBILE === 'true' ||
+  process.env.MOBILE === '1' ||
+  process.argv.includes('MOBILE');
+
 const main = async () => {
   process.once('SIGINT', () => shutdownAll('SIGINT'));
   process.once('SIGTERM', () => shutdownAll('SIGTERM'));
 
+  const spaScript = isMobile ? 'dev:spa:mobile' : 'dev:spa';
+  process.env.VITE_DEV_PORT = String(resolveVitePort(spaScript));
+
   nextProcess = runNpmScript('dev:next');
   watchChildExit(nextProcess, 'next');
 
-  viteProcess = runNpmScript('dev:spa');
+  if (isMobile) console.log('📱 Starting Vite in MOBILE mode');
+  viteProcess = runNpmScript(spaScript);
   watchChildExit(viteProcess, 'vite');
   runNextBackgroundTasks();
 
