@@ -8,7 +8,7 @@ import { appEnv } from '@/envs/app';
 import { getAgentRuntimeRedisClient } from '@/server/modules/AgentRuntime/redis';
 
 import type { PlatformBot, PlatformDescriptor, PlatformMessenger } from '../../types';
-import { DiscordRestApi } from './restApi';
+import { DiscordPlatformClient } from './client';
 
 const log = debug('lobe-server:bot:gateway:discord');
 
@@ -120,7 +120,7 @@ function extractChannelId(platformThreadId: string): string {
 }
 
 function createDiscordMessenger(
-  discord: DiscordRestApi,
+  discord: DiscordPlatformClient,
   channelId: string,
   platformThreadId: string,
 ): PlatformMessenger {
@@ -146,7 +146,7 @@ export const discordDescriptor: PlatformDescriptor = {
   parseMessageId: (compositeId) => compositeId,
 
   createMessenger(credentials, platformThreadId) {
-    const discord = new DiscordRestApi(credentials.botToken);
+    const discord = new DiscordPlatformClient(credentials.botToken);
     const channelId = extractChannelId(platformThreadId);
     return createDiscordMessenger(discord, channelId, platformThreadId);
   },

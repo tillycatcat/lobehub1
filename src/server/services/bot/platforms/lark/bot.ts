@@ -1,8 +1,7 @@
-import { createLarkAdapter } from '@lobechat/adapter-lark';
+import { createLarkAdapter, LarkApiClient } from '@lobechat/adapter-lark';
 import debug from 'debug';
 
-import type { PlatformBot, PlatformDescriptor } from '../../types';
-import { LarkRestApi } from './restApi';
+import type { PlatformBot, PlatformDescriptor, PlatformMessenger } from '../../types';
 
 const log = debug('lobe-server:bot:gateway:lark');
 
@@ -41,7 +40,7 @@ export class Lark implements PlatformBot {
     log('Starting LarkBot appId=%s platform=%s', this.applicationId, this.platform);
 
     // Verify credentials by fetching a tenant access token
-    const api = new LarkRestApi(this.config.appId, this.config.appSecret, this.platform);
+    const api = new LarkApiClient(this.config.appId, this.config.appSecret, this.platform);
     await api.getTenantAccessToken();
 
     log('LarkBot appId=%s credentials verified', this.applicationId);
@@ -59,6 +58,15 @@ function extractChatId(platformThreadId: string): string {
   return platformThreadId.split(':')[1];
 }
 
+function createLarkMessenger(api: LarkApiClient, chatId: string): PlatformMessenger {
+  return {
+    createMessage: (content) => api.sendMessage(chatId, content).then(() => {}),
+    editMessage: (messageId, content) => api.editMessage(messageId, content).then(() => {}),
+    removeReaction: () => Promise.resolve(),
+    triggerTyping: () => Promise.resolve(),
+  };
+}
+
 function createLarkDescriptorForPlatform(platform: 'lark' | 'feishu'): PlatformDescriptor {
   return {
     platform,
@@ -71,14 +79,9 @@ function createLarkDescriptorForPlatform(platform: 'lark' | 'feishu'): PlatformD
     parseMessageId: (compositeId) => compositeId,
 
     createMessenger(credentials, platformThreadId) {
-      const lark = new LarkRestApi(credentials.appId, credentials.appSecret, platform);
+      const lark = new LarkApiClient(credentials.appId, credentials.appSecret, platform);
       const chatId = extractChatId(platformThreadId);
-      return {
-        createMessage: (content) => lark.sendMessage(chatId, content).then(() => {}),
-        editMessage: (messageId, content) => lark.editMessage(messageId, content),
-        removeReaction: () => Promise.resolve(),
-        triggerTyping: () => Promise.resolve(),
-      };
+      return createLarkMessenger(lark, chatId);
     },
 
     createAdapter(credentials) {

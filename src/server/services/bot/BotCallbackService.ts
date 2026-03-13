@@ -7,7 +7,7 @@ import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 import { SystemAgentService } from '@/server/services/systemAgent';
 
 import { getPlatformDescriptor } from './platforms';
-import { DiscordRestApi } from './platforms/discord';
+import { DiscordPlatformClient } from './platforms/discord';
 import { renderError, renderFinalReply, renderStepProgress, splitMessage } from './replyTemplate';
 import type { PlatformMessenger } from './types';
 
@@ -219,7 +219,7 @@ export class BotCallbackService {
       if (platform === 'discord') {
         // Use reactionChannelId (parent channel for mentions, thread for follow-ups)
         const descriptor = getPlatformDescriptor(platform)!;
-        const discord = new DiscordRestApi(botToken);
+        const discord = new DiscordPlatformClient(botToken);
         const targetChannelId = reactionChannelId || descriptor.extractChatId(platformThreadId);
         await discord.removeOwnReaction(targetChannelId, userMessageId, '👀');
       } else {

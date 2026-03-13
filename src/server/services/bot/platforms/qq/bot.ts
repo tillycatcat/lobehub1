@@ -1,8 +1,7 @@
-import { createQQAdapter } from '@lobechat/adapter-qq';
+import { createQQAdapter, QQApiClient } from '@lobechat/adapter-qq';
 import debug from 'debug';
 
-import type { PlatformBot, PlatformDescriptor } from '../../types';
-import { QQRestApi } from './restApi';
+import type { PlatformBot, PlatformDescriptor, PlatformMessenger } from '../../types';
 
 const log = debug('lobe-server:bot:gateway:qq');
 
@@ -27,7 +26,7 @@ export class QQ implements PlatformBot {
     log('Starting QQBot appId=%s', this.applicationId);
 
     // Verify credentials by fetching an access token
-    const api = new QQRestApi(this.config.appId, this.config.appSecret!);
+    const api = new QQApiClient(this.config.appId, this.config.appSecret!);
     await api.getAccessToken();
 
     log('QQBot appId=%s credentials verified', this.applicationId);
@@ -58,6 +57,51 @@ function extractThreadType(platformThreadId: string): string {
   return platformThreadId.split(':')[1] || 'group';
 }
 
+async function sendQQMessage(
+  api: QQApiClient,
+  threadType: string,
+  targetId: string,
+  content: string,
+): Promise<void> {
+  switch (threadType) {
+    case 'group': {
+      await api.sendGroupMessage(targetId, content);
+      return;
+    }
+    case 'guild': {
+      await api.sendGuildMessage(targetId, content);
+      return;
+    }
+    case 'c2c': {
+      await api.sendC2CMessage(targetId, content);
+      return;
+    }
+    case 'dms': {
+      await api.sendDmsMessage(targetId, content);
+      return;
+    }
+    default: {
+      await api.sendGroupMessage(targetId, content);
+    }
+  }
+}
+
+function createQQMessenger(
+  api: QQApiClient,
+  targetId: string,
+  threadType: string,
+): PlatformMessenger {
+  return {
+    createMessage: (content) => sendQQMessage(api, threadType, targetId, content),
+    editMessage: (_messageId, content) =>
+      // QQ does not support editing — send a new message as fallback
+      sendQQMessage(api, threadType, targetId, content),
+    // QQ Bot API doesn't support reactions or typing
+    removeReaction: () => Promise.resolve(),
+    triggerTyping: () => Promise.resolve(),
+  };
+}
+
 export const qqDescriptor: PlatformDescriptor = {
   platform: 'qq',
   charLimit: 2000,
@@ -69,19 +113,10 @@ export const qqDescriptor: PlatformDescriptor = {
   parseMessageId: (compositeId) => compositeId,
 
   createMessenger(credentials, platformThreadId) {
-    const api = new QQRestApi(credentials.appId, credentials.appSecret);
+    const api = new QQApiClient(credentials.appId, credentials.appSecret);
     const targetId = extractChatId(platformThreadId);
     const threadType = extractThreadType(platformThreadId);
-
-    return {
-      createMessage: (content) => api.sendMessage(threadType, targetId, content).then(() => {}),
-      editMessage: (_messageId, content) =>
-        // QQ does not support editing — send a new message as fallback
-        api.sendAsEdit(threadType, targetId, content).then(() => {}),
-      // QQ Bot API doesn't support reactions or typing
-      removeReaction: () => Promise.resolve(),
-      triggerTyping: () => Promise.resolve(),
-    };
+    return createQQMessenger(api, targetId, threadType);
   },
 
   createAdapter(credentials) {

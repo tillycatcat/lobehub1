@@ -2,7 +2,7 @@ import type { StepPresentationData } from '../agentRuntime/types';
 import { getExtremeAck } from './ackPhrases';
 
 // Use raw Unicode emoji instead of Chat SDK emoji placeholders,
-// because bot-callback webhooks send via DiscordRestApi directly
+// because bot-callback webhooks send via DiscordPlatformClient directly
 // (not through the Chat SDK adapter that resolves placeholders).
 const EMOJI_THINKING = '💭';
 const EMOJI_SUCCESS = '✅';

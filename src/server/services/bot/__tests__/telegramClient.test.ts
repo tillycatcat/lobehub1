@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TelegramRestApi } from '../platforms/telegram/restApi';
+import { TelegramPlatformClient } from '../platforms/telegram/client';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-describe('TelegramRestApi', () => {
-  let api: TelegramRestApi;
+describe('TelegramPlatformClient', () => {
+  let api: TelegramPlatformClient;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    api = new TelegramRestApi('bot-token-123');
+    api = new TelegramPlatformClient('bot-token-123');
   });
 
   afterEach(() => {

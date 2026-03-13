@@ -4,7 +4,7 @@ import debug from 'debug';
 import { appEnv } from '@/envs/app';
 
 import type { PlatformBot, PlatformDescriptor, PlatformMessenger } from '../../types';
-import { TELEGRAM_API_BASE, TelegramRestApi } from './restApi';
+import { TELEGRAM_API_BASE, TelegramPlatformClient } from './client';
 
 const log = debug('lobe-server:bot:gateway:telegram');
 
@@ -117,7 +117,10 @@ function parseTelegramMessageId(compositeId: string): number {
   return colonIdx !== -1 ? Number(compositeId.slice(colonIdx + 1)) : Number(compositeId);
 }
 
-function createTelegramMessenger(telegram: TelegramRestApi, chatId: string): PlatformMessenger {
+function createTelegramMessenger(
+  telegram: TelegramPlatformClient,
+  chatId: string,
+): PlatformMessenger {
   return {
     createMessage: (content) => telegram.sendMessage(chatId, content).then(() => {}),
     editMessage: (messageId, content) =>
@@ -139,7 +142,7 @@ export const telegramDescriptor: PlatformDescriptor = {
   parseMessageId: parseTelegramMessageId,
 
   createMessenger(credentials, platformThreadId) {
-    const telegram = new TelegramRestApi(credentials.botToken);
+    const telegram = new TelegramPlatformClient(credentials.botToken);
     const chatId = extractChatId(platformThreadId);
     return createTelegramMessenger(telegram, chatId);
   },

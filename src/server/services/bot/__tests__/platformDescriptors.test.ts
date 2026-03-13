@@ -9,6 +9,17 @@ import { feishuDescriptor, larkDescriptor } from '../platforms/lark';
 import { qqDescriptor } from '../platforms/qq';
 import { telegramDescriptor } from '../platforms/telegram';
 
+const mockLarkEditMessage = vi.hoisted(() => vi.fn().mockResolvedValue({ raw: {} }));
+const mockLarkGetTenantAccessToken = vi.hoisted(() => vi.fn().mockResolvedValue('lark-token'));
+const mockLarkSendMessage = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ messageId: 'lark-msg-1', raw: {} }),
+);
+const mockQQGetAccessToken = vi.hoisted(() => vi.fn().mockResolvedValue('qq-token'));
+const mockQQSendC2CMessage = vi.hoisted(() => vi.fn().mockResolvedValue({ id: 'qq-msg-c2c' }));
+const mockQQSendDmsMessage = vi.hoisted(() => vi.fn().mockResolvedValue({ id: 'qq-msg-dms' }));
+const mockQQSendGroupMessage = vi.hoisted(() => vi.fn().mockResolvedValue({ id: 'qq-msg-1' }));
+const mockQQSendGuildMessage = vi.hoisted(() => vi.fn().mockResolvedValue({ id: 'qq-msg-guild' }));
+
 // Mock external dependencies before importing
 vi.mock('@chat-adapter/discord', () => ({
   createDiscordAdapter: vi.fn().mockReturnValue({ type: 'discord-adapter' }),
@@ -20,14 +31,19 @@ vi.mock('@chat-adapter/telegram', () => ({
 
 vi.mock('@lobechat/adapter-lark', () => ({
   createLarkAdapter: vi.fn().mockReturnValue({ type: 'lark-adapter' }),
+  LarkApiClient: vi.fn().mockImplementation(() => ({
+    editMessage: mockLarkEditMessage,
+    getTenantAccessToken: mockLarkGetTenantAccessToken,
+    sendMessage: mockLarkSendMessage,
+  })),
 }));
 
 vi.mock('@/envs/app', () => ({
   appEnv: { APP_URL: 'https://app.example.com' },
 }));
 
-vi.mock('../platforms/discord/restApi', () => ({
-  DiscordRestApi: vi.fn().mockImplementation(() => ({
+vi.mock('../platforms/discord/client', () => ({
+  DiscordPlatformClient: vi.fn().mockImplementation(() => ({
     createMessage: vi.fn().mockResolvedValue({ id: 'msg-1' }),
     editMessage: vi.fn().mockResolvedValue(undefined),
     removeOwnReaction: vi.fn().mockResolvedValue(undefined),
@@ -36,8 +52,8 @@ vi.mock('../platforms/discord/restApi', () => ({
   })),
 }));
 
-vi.mock('../platforms/telegram/restApi', () => ({
-  TelegramRestApi: vi.fn().mockImplementation(() => ({
+vi.mock('../platforms/telegram/client', () => ({
+  TelegramPlatformClient: vi.fn().mockImplementation(() => ({
     editMessageText: vi.fn().mockResolvedValue(undefined),
     removeMessageReaction: vi.fn().mockResolvedValue(undefined),
     sendChatAction: vi.fn().mockResolvedValue(undefined),
@@ -45,23 +61,14 @@ vi.mock('../platforms/telegram/restApi', () => ({
   })),
 }));
 
-vi.mock('../platforms/lark/restApi', () => ({
-  LarkRestApi: vi.fn().mockImplementation(() => ({
-    editMessage: vi.fn().mockResolvedValue(undefined),
-    sendMessage: vi.fn().mockResolvedValue({ messageId: 'lark-msg-1' }),
-  })),
-}));
-
 vi.mock('@lobechat/adapter-qq', () => ({
   createQQAdapter: vi.fn().mockReturnValue({ type: 'qq-adapter' }),
-}));
-
-vi.mock('../platforms/qq/restApi', () => ({
-  QQ_API_BASE: 'https://api.sgroup.qq.com',
-  QQRestApi: vi.fn().mockImplementation(() => ({
-    getAccessToken: vi.fn().mockResolvedValue('qq-token'),
-    sendAsEdit: vi.fn().mockResolvedValue({ id: 'qq-msg-edit' }),
-    sendMessage: vi.fn().mockResolvedValue({ id: 'qq-msg-1' }),
+  QQApiClient: vi.fn().mockImplementation(() => ({
+    getAccessToken: mockQQGetAccessToken,
+    sendC2CMessage: mockQQSendC2CMessage,
+    sendDmsMessage: mockQQSendDmsMessage,
+    sendGroupMessage: mockQQSendGroupMessage,
+    sendGuildMessage: mockQQSendGuildMessage,
   })),
 }));
 
@@ -268,6 +275,12 @@ describe('larkDescriptor', () => {
       const credentials = { appId: 'cli_abc', appSecret: 'secret' };
       const messenger = larkDescriptor.createMessenger(credentials, 'lark:oc_abc123');
 
+      await messenger.createMessage('hello');
+      await messenger.editMessage('om_abc123', 'updated');
+
+      expect(mockLarkSendMessage).toHaveBeenCalledWith('oc_abc123', 'hello');
+      expect(mockLarkEditMessage).toHaveBeenCalledWith('om_abc123', 'updated');
+
       // Lark has no reaction/typing API
       await expect(messenger.removeReaction('msg-1', '👀')).resolves.toBeUndefined();
       await expect(messenger.triggerTyping()).resolves.toBeUndefined();
@@ -340,7 +353,7 @@ describe('qqDescriptor', () => {
   });
 
   describe('createMessenger', () => {
-    it('should create a messenger with all required methods', () => {
+    it('should create a messenger with all required methods', async () => {
       const credentials = { appId: 'app-123', appSecret: 'secret-456' };
       const messenger = qqDescriptor.createMessenger(credentials, 'qq:group:group-123');
 
@@ -348,6 +361,12 @@ describe('qqDescriptor', () => {
       expect(messenger).toHaveProperty('editMessage');
       expect(messenger).toHaveProperty('removeReaction');
       expect(messenger).toHaveProperty('triggerTyping');
+
+      await messenger.createMessage('hello');
+      await messenger.editMessage('msg-1', 'updated');
+
+      expect(mockQQSendGroupMessage).toHaveBeenCalledWith('group-123', 'hello');
+      expect(mockQQSendGroupMessage).toHaveBeenCalledWith('group-123', 'updated');
     });
 
     it('should have no-op reaction and typing', async () => {

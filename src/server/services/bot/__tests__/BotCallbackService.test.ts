@@ -53,8 +53,8 @@ vi.mock('@/server/services/systemAgent', () => ({
   })),
 }));
 
-vi.mock('../platforms/discord/restApi', () => ({
-  DiscordRestApi: vi.fn().mockImplementation(() => ({
+vi.mock('../platforms/discord/client', () => ({
+  DiscordPlatformClient: vi.fn().mockImplementation(() => ({
     createMessage: mockDiscordCreateMessage,
     editMessage: mockDiscordEditMessage,
     removeOwnReaction: mockDiscordRemoveOwnReaction,
@@ -63,8 +63,8 @@ vi.mock('../platforms/discord/restApi', () => ({
   })),
 }));
 
-vi.mock('../platforms/telegram/restApi', () => ({
-  TelegramRestApi: vi.fn().mockImplementation(() => ({
+vi.mock('../platforms/telegram/client', () => ({
+  TelegramPlatformClient: vi.fn().mockImplementation(() => ({
     editMessageText: mockTelegramEditMessageText,
     removeMessageReaction: mockTelegramRemoveMessageReaction,
     sendChatAction: mockTelegramSendChatAction,
@@ -439,7 +439,7 @@ describe('BotCallbackService', () => {
 
       await service.handleCallback(body);
 
-      // Discord uses a separate DiscordRestApi instance for reaction removal
+      // Discord uses a separate DiscordPlatformClient instance for reaction removal
       expect(mockDiscordRemoveOwnReaction).toHaveBeenCalled();
     });
 
