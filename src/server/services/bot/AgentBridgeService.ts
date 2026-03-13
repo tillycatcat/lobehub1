@@ -13,7 +13,6 @@ import { isQueueAgentRuntimeEnabled } from '@/server/services/queue/impls';
 import { SystemAgentService } from '@/server/services/systemAgent';
 
 import { formatPrompt as formatPromptUtil } from './formatPrompt';
-import { getPlatformDescriptor } from './platforms';
 import {
   renderError,
   renderFinalReply,
@@ -134,7 +133,7 @@ export class AgentBridgeService {
     }
   >();
 
-  /** Default debounce window (ms). Platforms can override via descriptor.debounceMs. */
+  /** Default debounce window (ms). Platforms can override via settings.debounceMs. */
   private static readonly DEFAULT_DEBOUNCE_MS = 2000;
 
   /**
@@ -237,11 +236,12 @@ export class AgentBridgeService {
     // Debounce: buffer rapid-fire messages and merge them into one prompt.
     // The first caller wins and drives the execution; subsequent callers
     // append their message to the buffer and return immediately.
-    const descriptor = botContext?.platform
-      ? getPlatformDescriptor(botContext.platform)
-      : undefined;
-    const debounceMs = descriptor?.debounceMs ?? AgentBridgeService.DEFAULT_DEBOUNCE_MS;
-    const batch = await AgentBridgeService.bufferMessage(thread.id, message, debounceMs);
+    // TODO: resolve debounceMs from settings when entry-based registry is wired
+    const batch = await AgentBridgeService.bufferMessage(
+      thread.id,
+      message,
+      AgentBridgeService.DEFAULT_DEBOUNCE_MS,
+    );
     if (!batch) {
       log('handleMention: message buffered for thread=%s, waiting for debounce', thread.id);
       return;
@@ -349,11 +349,12 @@ export class AgentBridgeService {
     }
 
     // Debounce: same as handleMention — merge rapid-fire messages
-    const descriptor = botContext?.platform
-      ? getPlatformDescriptor(botContext.platform)
-      : undefined;
-    const debounceMs = descriptor?.debounceMs ?? AgentBridgeService.DEFAULT_DEBOUNCE_MS;
-    const batch = await AgentBridgeService.bufferMessage(thread.id, message, debounceMs);
+    // TODO: resolve debounceMs from settings when entry-based registry is wired
+    const batch = await AgentBridgeService.bufferMessage(
+      thread.id,
+      message,
+      AgentBridgeService.DEFAULT_DEBOUNCE_MS,
+    );
     if (!batch) {
       log('handleSubscribedMessage: message buffered for thread=%s', thread.id);
       return;
@@ -673,9 +674,8 @@ export class AgentBridgeService {
                     totalTokens: finalState.usage?.llm?.tokens?.total ?? 0,
                   });
 
-                  const descriptor = platform ? getPlatformDescriptor(platform) : undefined;
-                  const charLimit = descriptor?.charLimit;
-                  const chunks = splitMessage(finalText, charLimit);
+                  // TODO: resolve charLimit from settings when entry-based registry is wired
+                  const chunks = splitMessage(finalText);
 
                   if (progressMessage) {
                     try {

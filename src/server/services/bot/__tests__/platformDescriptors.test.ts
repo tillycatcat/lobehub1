@@ -94,14 +94,6 @@ describe('platformDescriptors registry', () => {
 });
 
 describe('discordDescriptor', () => {
-  it('should have correct platform properties', () => {
-    expect(discordDescriptor.platform).toBe('discord');
-    expect(discordDescriptor.persistent).toBe(true);
-    expect(discordDescriptor.handleDirectMessages).toBe(false);
-    expect(discordDescriptor.charLimit).toBeUndefined();
-    expect(discordDescriptor.requiredCredentials).toEqual(['botToken']);
-  });
-
   describe('extractChatId', () => {
     it('should extract channel ID from 3-part thread ID (no thread)', () => {
       expect(discordDescriptor.extractChatId('discord:guild:channel-123')).toBe('channel-123');
@@ -174,14 +166,6 @@ describe('discordDescriptor', () => {
 });
 
 describe('telegramDescriptor', () => {
-  it('should have correct platform properties', () => {
-    expect(telegramDescriptor.platform).toBe('telegram');
-    expect(telegramDescriptor.persistent).toBe(false);
-    expect(telegramDescriptor.handleDirectMessages).toBe(true);
-    expect(telegramDescriptor.charLimit).toBe(4000);
-    expect(telegramDescriptor.requiredCredentials).toEqual(['botToken']);
-  });
-
   describe('extractChatId', () => {
     it('should extract chat ID from platformThreadId', () => {
       expect(telegramDescriptor.extractChatId('telegram:chat-456')).toBe('chat-456');
@@ -229,14 +213,6 @@ describe('telegramDescriptor', () => {
 });
 
 describe('larkDescriptor', () => {
-  it('should have correct platform properties', () => {
-    expect(larkDescriptor.platform).toBe('lark');
-    expect(larkDescriptor.persistent).toBe(false);
-    expect(larkDescriptor.handleDirectMessages).toBe(true);
-    expect(larkDescriptor.charLimit).toBe(4000);
-    expect(larkDescriptor.requiredCredentials).toEqual(['appId', 'appSecret']);
-  });
-
   describe('extractChatId', () => {
     it('should extract chat ID from platformThreadId', () => {
       expect(larkDescriptor.extractChatId('lark:oc_abc123')).toBe('oc_abc123');
@@ -293,14 +269,6 @@ describe('larkDescriptor', () => {
 });
 
 describe('feishuDescriptor', () => {
-  it('should have correct platform properties', () => {
-    expect(feishuDescriptor.platform).toBe('feishu');
-    expect(feishuDescriptor.persistent).toBe(false);
-    expect(feishuDescriptor.handleDirectMessages).toBe(true);
-    expect(feishuDescriptor.charLimit).toBe(4000);
-    expect(feishuDescriptor.requiredCredentials).toEqual(['appId', 'appSecret']);
-  });
-
   describe('createAdapter', () => {
     it('should create adapter with feishu platform', () => {
       const credentials = { appId: 'cli_abc', appSecret: 'secret' };
@@ -315,14 +283,6 @@ describe('feishuDescriptor', () => {
 });
 
 describe('qqDescriptor', () => {
-  it('should have correct platform properties', () => {
-    expect(qqDescriptor.platform).toBe('qq');
-    expect(qqDescriptor.persistent).toBe(false);
-    expect(qqDescriptor.handleDirectMessages).toBe(true);
-    expect(qqDescriptor.charLimit).toBe(2000);
-    expect(qqDescriptor.requiredCredentials).toEqual(['appId', 'appSecret']);
-  });
-
   describe('extractChatId', () => {
     it('should extract target ID from qq thread ID', () => {
       expect(qqDescriptor.extractChatId('qq:group:group-123')).toBe('group-123');

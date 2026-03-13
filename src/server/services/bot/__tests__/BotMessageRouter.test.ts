@@ -70,7 +70,6 @@ vi.mock('../platforms', () => ({
       createAdapter: mockCreateAdapter,
       handleDirectMessages: platform === 'telegram' || platform === 'lark',
       onBotRegistered: mockOnBotRegistered,
-      persistent: platform === 'discord',
       platform,
     };
   }),
@@ -154,7 +153,7 @@ describe('BotMessageRouter', () => {
       );
     });
 
-    it('should register onNewMessage for platforms with handleDirectMessages', async () => {
+    it('should register onNewMessage for platforms with dm.enabled in settings', async () => {
       mockFindEnabledByPlatform.mockImplementation((_db: any, platform: string) => {
         if (platform === 'telegram') {
           return [
@@ -162,6 +161,7 @@ describe('BotMessageRouter', () => {
               agentId: 'agent-1',
               applicationId: 'tg-bot-123',
               credentials: { botToken: 'tg-token' },
+              settings: { dm: { enabled: true } },
               userId: 'user-1',
             },
           ];

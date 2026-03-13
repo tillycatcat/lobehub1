@@ -69,12 +69,6 @@ function createLarkMessenger(api: LarkApiClient, chatId: string): PlatformMessen
 
 function createLarkDescriptorForPlatform(platform: 'lark' | 'feishu'): PlatformDescriptor {
   return {
-    platform,
-    charLimit: 4000,
-    persistent: false,
-    handleDirectMessages: true,
-    requiredCredentials: ['appId', 'appSecret'],
-
     extractChatId,
     parseMessageId: (compositeId) => compositeId,
 

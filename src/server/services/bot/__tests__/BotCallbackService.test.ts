@@ -78,8 +78,8 @@ const FAKE_DB = {} as any;
 const FAKE_BOT_TOKEN = 'fake-bot-token-123';
 const FAKE_CREDENTIALS = JSON.stringify({ botToken: FAKE_BOT_TOKEN });
 
-function setupCredentials(credentials = FAKE_CREDENTIALS) {
-  mockFindByPlatformAndAppId.mockResolvedValue({ credentials });
+function setupCredentials(credentials = FAKE_CREDENTIALS, extra?: Record<string, unknown>) {
+  mockFindByPlatformAndAppId.mockResolvedValue({ credentials, ...extra });
   mockInitWithEnvKey.mockResolvedValue({ decrypt: mockDecrypt });
   mockDecrypt.mockResolvedValue({ plaintext: credentials });
 }
@@ -150,17 +150,6 @@ describe('BotCallbackService', () => {
 
       await expect(service.handleCallback(body)).rejects.toThrow(
         'Bot provider not found for discord appId=app-123',
-      );
-    });
-
-    it('should throw when credentials have no botToken', async () => {
-      const noTokenCreds = JSON.stringify({ someOtherKey: 'value' });
-      setupCredentials(noTokenCreds);
-
-      const body = makeBody({ type: 'step' });
-
-      await expect(service.handleCallback(body)).rejects.toThrow(
-        'Bot credentials incomplete for discord appId=app-123',
       );
     });
 
@@ -394,6 +383,9 @@ describe('BotCallbackService', () => {
     });
 
     it('should use Telegram char limit (4000) for Telegram platform', async () => {
+      // Re-setup with settings to provide charLimit
+      setupCredentials(FAKE_CREDENTIALS, { settings: { charLimit: 4000 } });
+
       // Content just over default 1800 but under 4000 should NOT split for Telegram
       const mediumContent = 'B'.repeat(2500);
 
@@ -411,6 +403,7 @@ describe('BotCallbackService', () => {
     });
 
     it('should split Telegram messages that exceed 4000 chars', async () => {
+      setupCredentials(FAKE_CREDENTIALS, { settings: { charLimit: 4000 } });
       const longContent = 'C'.repeat(6000);
 
       const body = makeTelegramBody({

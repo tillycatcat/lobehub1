@@ -137,11 +137,6 @@ function createDiscordMessenger(
 }
 
 export const discordDescriptor: PlatformDescriptor = {
-  platform: 'discord',
-  persistent: true,
-  handleDirectMessages: false,
-  requiredCredentials: ['botToken'],
-
   extractChatId: extractChannelId,
   parseMessageId: (compositeId) => compositeId,
 

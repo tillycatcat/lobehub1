@@ -1,44 +1,5 @@
 import { createQQAdapter, QQApiClient } from '@lobechat/adapter-qq';
-import debug from 'debug';
-
-import type { PlatformBot, PlatformDescriptor, PlatformMessenger } from '../../types';
-
-const log = debug('lobe-server:bot:gateway:qq');
-
-export interface QQBotConfig {
-  [key: string]: string | undefined;
-  appId: string;
-  appSecret: string;
-}
-
-export class QQ implements PlatformBot {
-  readonly platform = 'qq';
-  readonly applicationId: string;
-
-  private config: QQBotConfig;
-
-  constructor(config: QQBotConfig) {
-    this.config = config;
-    this.applicationId = config.appId;
-  }
-
-  async start(): Promise<void> {
-    log('Starting QQBot appId=%s', this.applicationId);
-
-    // Verify credentials by fetching an access token
-    const api = new QQApiClient(this.config.appId, this.config.appSecret!);
-    await api.getAccessToken();
-
-    log('QQBot appId=%s credentials verified', this.applicationId);
-  }
-
-  async stop(): Promise<void> {
-    log('Stopping QQBot appId=%s', this.applicationId);
-    // No cleanup needed — webhook is configured in QQ Open Platform
-  }
-}
-
-// --------------- Platform Descriptor ---------------
+import type { PlatformDescriptor, PlatformMessenger } from '@lobechat/bot-platform-core';
 
 /**
  * Extract the target ID from a QQ platformThreadId.

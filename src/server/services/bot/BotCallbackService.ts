@@ -107,14 +107,12 @@ export class BotCallbackService {
       throw new Error(`Unsupported platform: ${platform}`);
     }
 
-    const missingCreds = descriptor.requiredCredentials.filter((k) => !credentials[k]);
-    if (missingCreds.length > 0) {
-      throw new Error(`Bot credentials incomplete for ${platform} appId=${applicationId}`);
-    }
+    const settings = (row as any).settings as Record<string, unknown> | undefined;
+    const charLimit = (settings?.charLimit as number) || undefined;
 
     return {
       botToken: credentials.botToken || credentials.appId,
-      charLimit: descriptor.charLimit,
+      charLimit,
       messenger: descriptor.createMessenger(credentials, platformThreadId),
     };
   }

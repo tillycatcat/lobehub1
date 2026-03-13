@@ -265,6 +265,7 @@ export class BotMessageRouter {
             agentId,
             applicationId,
             platform,
+            settings: provider.settings as Record<string, any> | undefined,
             userId,
           });
           await bot.initialize();
@@ -352,7 +353,11 @@ export class BotMessageRouter {
   private registerHandlers(
     bot: Chat<any>,
     serverDB: LobeChatDatabase,
-    info: ResolvedAgentInfo & { applicationId: string; platform: string },
+    info: ResolvedAgentInfo & {
+      applicationId: string;
+      platform: string;
+      settings?: Record<string, any>;
+    },
   ): void {
     const { agentId, applicationId, platform, userId } = info;
     const bridge = new AgentBridgeService(serverDB, userId);
@@ -388,9 +393,9 @@ export class BotMessageRouter {
       });
     });
 
-    // Register onNewMessage handler based on platform descriptor
-    const descriptor = getPlatformDescriptor(platform);
-    if (descriptor?.handleDirectMessages) {
+    // Register onNewMessage handler based on platform config
+    const dmEnabled = info.settings?.dm?.enabled ?? false;
+    if (dmEnabled) {
       bot.onNewMessage(/./, async (thread, message) => {
         if (message.author.isBot === true) return;
 

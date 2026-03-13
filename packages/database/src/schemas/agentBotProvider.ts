@@ -1,4 +1,13 @@
-import { boolean, index, pgTable, text, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  jsonb,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 
 import { timestamps } from './_helpers';
@@ -27,19 +36,29 @@ export const agentBotProviders = pgTable(
     /** Platform identifier: 'discord' | 'slack' | 'feishu' | ... */
     platform: varchar('platform', { length: 50 }).notNull(),
 
+    /** Connection mode: how this bot connects to the platform */
+    connectionMode: varchar('connection_mode', { length: 20 }).notNull().default('webhook'),
+
     /** Platform-specific application/bot ID used for webhook routing */
     applicationId: varchar('application_id', { length: 255 }).notNull(),
 
     /** Encrypted credentials string (decrypted to JSON with botToken, publicKey, etc.) */
     credentials: text('credentials'),
 
+    /** User-configurable settings (dm policy, charLimit, debounce, etc.) */
+    settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
+
     enabled: boolean('enabled').default(true).notNull(),
 
     ...timestamps,
   },
   (t) => [
-    // Fast webhook lookup: platform + applicationId → agent
-    uniqueIndex('agent_bot_providers_platform_app_id_unique').on(t.platform, t.applicationId),
+    // Fast webhook lookup: platform + connectionMode + applicationId → agent
+    uniqueIndex('agent_bot_providers_platform_conn_app_id_unique').on(
+      t.platform,
+      t.connectionMode,
+      t.applicationId,
+    ),
     index('agent_bot_providers_platform_idx').on(t.platform),
     index('agent_bot_providers_agent_id_idx').on(t.agentId),
     index('agent_bot_providers_user_id_idx').on(t.userId),

@@ -132,12 +132,6 @@ function createTelegramMessenger(
 }
 
 export const telegramDescriptor: PlatformDescriptor = {
-  platform: 'telegram',
-  charLimit: 4000,
-  persistent: false,
-  handleDirectMessages: true,
-  requiredCredentials: ['botToken'],
-
   extractChatId,
   parseMessageId: parseTelegramMessageId,
 
