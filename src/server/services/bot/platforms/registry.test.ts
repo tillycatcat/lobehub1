@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildRuntimeKey, parseRuntimeKey, PlatformRegistry } from './registry';
+import { PlatformRegistry } from './registry';
+import { buildRuntimeKey, parseRuntimeKey } from './utils';
 
 describe('PlatformRegistry', () => {
   const fakeDef = (id: string, factory?: any) =>

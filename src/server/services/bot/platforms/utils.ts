@@ -1,5 +1,31 @@
 import type { UsageStats } from './types';
 
+// --------------- Runtime key helpers ---------------
+
+/**
+ * Build a runtime key for a registered bot instance.
+ * Format: `platform:applicationId`
+ */
+export function buildRuntimeKey(platform: string, applicationId: string): string {
+  return `${platform}:${applicationId}`;
+}
+
+/**
+ * Parse a runtime key back into its components.
+ */
+export function parseRuntimeKey(key: string): {
+  applicationId: string;
+  platform: string;
+} {
+  const idx = key.indexOf(':');
+  return {
+    applicationId: idx === -1 ? key : key.slice(idx + 1),
+    platform: idx === -1 ? '' : key.slice(0, idx),
+  };
+}
+
+// --------------- Formatting helpers ---------------
+
 export function formatTokens(tokens: number): string {
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}m`;
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`;

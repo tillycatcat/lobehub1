@@ -81,27 +81,3 @@ export class PlatformRegistry {
     return definition.adapterFactory.validateCredentials(credentials, settings);
   }
 }
-
-// --------------- Key helpers ---------------
-
-/**
- * Build a runtime key for a registered bot instance.
- * Format: `platform:applicationId`
- */
-export function buildRuntimeKey(platform: string, applicationId: string): string {
-  return `${platform}:${applicationId}`;
-}
-
-/**
- * Parse a runtime key back into its components.
- */
-export function parseRuntimeKey(key: string): {
-  applicationId: string;
-  platform: string;
-} {
-  const idx = key.indexOf(':');
-  return {
-    applicationId: idx === -1 ? key : key.slice(idx + 1),
-    platform: idx === -1 ? '' : key.slice(0, idx),
-  };
-}

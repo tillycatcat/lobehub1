@@ -6,7 +6,7 @@ import { qq } from './qq/definition';
 import { PlatformRegistry } from './registry';
 import { telegram } from './telegram/definition';
 
-export { buildRuntimeKey, parseRuntimeKey, PlatformRegistry } from './registry';
+export { PlatformRegistry } from './registry';
 export type {
   AdapterFactory,
   BotPlatformRedisClient,
@@ -22,7 +22,13 @@ export type {
   UsageStats,
   ValidationResult,
 } from './types';
-export { formatDuration, formatTokens, formatUsageStats } from './utils';
+export {
+  buildRuntimeKey,
+  formatDuration,
+  formatTokens,
+  formatUsageStats,
+  parseRuntimeKey,
+} from './utils';
 
 // --------------- Platform definitions ---------------
 export { discord } from './discord/definition';
