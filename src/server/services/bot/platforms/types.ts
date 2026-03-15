@@ -6,6 +6,8 @@
 
 export interface CredentialField {
   description?: string;
+  /** Only show this field in development environment */
+  devOnly?: boolean;
   key: string;
   label: string;
   placeholder?: string;
@@ -207,6 +209,12 @@ export abstract class ClientFactory {
  * Contains metadata, factory, and validation. All runtime operations go through PlatformClient.
  */
 export interface PlatformDefinition {
+  /** Which credential key serves as the applicationId */
+  applicationIdField: string;
+
+  /** Auto-derive applicationId from another credential field */
+  autoApplicationId?: { deriveFrom: string; strategy: 'before-colon' };
+
   /** Factory for creating PlatformClient instances and validating credentials/settings. */
   clientFactory: ClientFactory;
 
@@ -225,9 +233,15 @@ export interface PlatformDefinition {
   /** The name of the platform. */
   name: string;
 
-  /** Strip platform-specific bot mention artifacts from user input text. */
-  sanitizeUserInput?: (text: string, applicationId: string) => string;
-
   /** The settings schema required for the platform. */
   settings?: PlatformSettingsSchema;
+
+  /** How the webhook is configured: 'auto' = set via API, 'manual' = user copies URL */
+  webhookMode: 'auto' | 'manual';
 }
+
+/** Serialized platform definition for frontend consumption (excludes runtime-only fields). */
+export type SerializedPlatformDefinition = Omit<
+  PlatformDefinition,
+  'clientFactory' | 'sanitizeUserInput'
+>;

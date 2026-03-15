@@ -1,20 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { formatPrompt, formatReferencedMessage } from '../formatPrompt';
-
-vi.mock('../platforms', () => ({
-  platformRegistry: {
-    getPlatform: vi.fn().mockImplementation((platform: string) => {
-      if (platform === 'discord') {
-        return {
-          sanitizeUserInput: (text: string, applicationId: string) =>
-            text.replaceAll(new RegExp(`<@!?${applicationId}>\\s*`, 'g'), '').trim(),
-        };
-      }
-      return undefined;
-    }),
-  },
-}));
 
 describe('formatReferencedMessage', () => {
   it('should return undefined when raw is undefined', () => {
@@ -91,6 +77,8 @@ describe('formatPrompt', () => {
     text: 'hello world',
   };
 
+  const discordSanitize = (text: string) => text.replaceAll(/<@!?bot123>\s*/g, '').trim();
+
   it('should format basic message with speaker tag', () => {
     const result = formatPrompt(baseMessage);
 
@@ -102,7 +90,7 @@ describe('formatPrompt', () => {
 
   it('should strip bot @mention from text', () => {
     const msg = { ...baseMessage, text: '<@bot123> hello world' };
-    const result = formatPrompt(msg, { applicationId: 'bot123', platform: 'discord' });
+    const result = formatPrompt(msg, { sanitizeUserInput: discordSanitize });
 
     expect(result).toContain('hello world');
     expect(result).not.toContain('<@bot123>');
@@ -110,15 +98,15 @@ describe('formatPrompt', () => {
 
   it('should strip bot @mention with ! format', () => {
     const msg = { ...baseMessage, text: '<@!bot123> hello world' };
-    const result = formatPrompt(msg, { applicationId: 'bot123', platform: 'discord' });
+    const result = formatPrompt(msg, { sanitizeUserInput: discordSanitize });
 
     expect(result).toContain('hello world');
     expect(result).not.toContain('<@!bot123>');
   });
 
-  it('should not strip mentions for platforms without sanitizeUserInput', () => {
+  it('should not strip mentions when no sanitizeUserInput provided', () => {
     const msg = { ...baseMessage, text: '<@bot123> hello world' };
-    const result = formatPrompt(msg, { applicationId: 'bot123', platform: 'telegram' });
+    const result = formatPrompt(msg);
 
     expect(result).toContain('<@bot123>');
   });
@@ -167,6 +155,8 @@ describe('formatPrompt', () => {
   });
 
   it('should handle both @mention stripping and referenced message together', () => {
+    const sanitize = (text: string) => text.replaceAll(/<@!?bot999>\s*/g, '').trim();
+
     const msg = {
       ...baseMessage,
       raw: {
@@ -177,7 +167,7 @@ describe('formatPrompt', () => {
       },
       text: '<@bot999> yes we can',
     };
-    const result = formatPrompt(msg, { applicationId: 'bot999', platform: 'discord' });
+    const result = formatPrompt(msg, { sanitizeUserInput: sanitize });
 
     expect(result).not.toContain('<@bot999>');
     expect(result).toContain('yes we can');

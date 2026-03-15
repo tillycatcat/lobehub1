@@ -1,7 +1,5 @@
 import { formatSpeakerMessage } from '@lobechat/prompts';
 
-import { platformRegistry } from './platforms';
-
 interface RawReferencedMessage {
   author?: { global_name?: string; username?: string };
   content?: string;
@@ -16,9 +14,9 @@ interface MessageLike {
   text: string;
 }
 
-interface BotContext {
-  applicationId?: string;
-  platform?: string;
+interface FormatPromptOptions {
+  /** Strip platform-specific bot mention artifacts from user input. */
+  sanitizeUserInput?: (text: string) => string;
 }
 
 /**
@@ -38,18 +36,15 @@ export const formatReferencedMessage = (
 
 /**
  * Format user message into agent prompt:
- * 1. Strip platform-specific bot mentions via entry.sanitizeUserInput
+ * 1. Strip platform-specific bot mentions via sanitizeUserInput
  * 2. Prepend referenced (quoted/replied) message if present
  * 3. Add speaker tag with user identity
  */
-export const formatPrompt = (message: MessageLike, botContext?: BotContext): string => {
+export const formatPrompt = (message: MessageLike, options?: FormatPromptOptions): string => {
   let text = message.text;
 
-  if (botContext?.platform && botContext.applicationId) {
-    const entry = platformRegistry.getPlatform(botContext.platform);
-    if (entry?.sanitizeUserInput) {
-      text = entry.sanitizeUserInput(text, botContext.applicationId);
-    }
+  if (options?.sanitizeUserInput) {
+    text = options.sanitizeUserInput(text);
   }
 
   // Prepend referenced (quoted/replied) message if present

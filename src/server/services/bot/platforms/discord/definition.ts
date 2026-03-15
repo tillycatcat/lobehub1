@@ -56,9 +56,6 @@ export const discord: PlatformDefinition = {
     portalUrl: 'https://discord.com/developers/applications',
     setupGuideUrl: 'https://lobehub.com/docs/usage/channels/discord',
   },
-  sanitizeUserInput: (text, applicationId) =>
-    text.replaceAll(new RegExp(`<@!?${applicationId}>\\s*`, 'g'), '').trim(),
-
   credentials: [
     { key: 'botToken', label: 'Bot Token', required: true, type: 'secret' },
     { key: 'publicKey', label: 'Public Key', required: true, type: 'string' },

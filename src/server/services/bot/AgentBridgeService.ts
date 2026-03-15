@@ -436,11 +436,12 @@ export class AgentBridgeService {
       agentId: string;
       botContext?: ChatTopicBotContext;
       channelContext?: DiscordChannelContext;
+      client?: PlatformClient;
       topicId?: string;
       trigger?: string;
     },
   ): Promise<{ reply: string; topicId: string }> {
-    const { agentId, botContext, channelContext, topicId, trigger } = opts;
+    const { agentId, botContext, channelContext, client, topicId, trigger } = opts;
 
     const aiAgentService = new AiAgentService(this.db, this.userId);
     const timezone = await this.loadTimezone();
@@ -478,7 +479,7 @@ export class AgentBridgeService {
     };
 
     const files = this.extractFiles(userMessage);
-    const prompt = this.formatPrompt(userMessage, botContext);
+    const prompt = this.formatPrompt(userMessage, client);
 
     log(
       'executeWithWebhooks: agentId=%s, callbackUrl=%s, progressMessageId=%s, prompt=%s, files=%d',
@@ -564,7 +565,7 @@ export class AgentBridgeService {
       const getElapsedMs = () => (operationStartTime > 0 ? Date.now() - operationStartTime : 0);
 
       const files = this.extractFiles(userMessage);
-      const prompt = this.formatPrompt(userMessage, botContext);
+      const prompt = this.formatPrompt(userMessage, client);
 
       log(
         'executeWithInMemoryCallbacks: agentId=%s, prompt=%s, files=%d',
@@ -841,8 +842,10 @@ export class AgentBridgeService {
    * Format user message into agent prompt.
    * Delegates to the standalone formatPrompt utility.
    */
-  private formatPrompt(message: Message, botContext?: ChatTopicBotContext): string {
-    return formatPromptUtil(message as any, botContext);
+  private formatPrompt(message: Message, client?: PlatformClient): string {
+    return formatPromptUtil(message as any, {
+      sanitizeUserInput: client?.sanitizeUserInput?.bind(client),
+    });
   }
 
   /**
