@@ -1,0 +1,45 @@
+{
+  "name": "@lobechat/bot-platform",
+  "version": "0.1.0",
+  "description": "Bot platform types and platform implementations for LobeHub",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chat-adapter/discord": "^4.17.0",
+    "@chat-adapter/telegram": "^4.17.0",
+    "@discordjs/rest": "^2.4.3",
+    "@lobechat/adapter-lark": "workspace:*",
+    "@lobechat/adapter-qq": "workspace:*",
+    "debug": "^4.4.0",
+    "discord-api-types": "^0.37.119"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "peerDependencies": {
+    "@chat-adapter/state-ioredis": "^4.17.0",
+    "chat": "^4.14.0"
+  },
+  "peerDependenciesMeta": {
+    "@chat-adapter/state-ioredis": {
+      "optional": true
+    },
+    "chat": {
+      "optional": true
+    }
+  }
+}

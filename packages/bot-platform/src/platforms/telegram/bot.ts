@@ -1,0 +1,111 @@
+import { createTelegramAdapter } from '@chat-adapter/telegram';
+import debug from 'debug';
+
+import type {
+  BotPlatformRuntimeContext,
+  BotProviderConfig,
+  PlatformBot,
+  PlatformBotFactory,
+  PlatformMessenger,
+} from '../../types';
+import { TELEGRAM_API_BASE, TelegramPlatformClient } from './client';
+import { extractBotId, setTelegramWebhook } from './helpers';
+
+const log = debug('bot-platform:telegram:bot');
+
+function extractChatId(platformThreadId: string): string {
+  return platformThreadId.split(':')[1];
+}
+
+function parseTelegramMessageId(compositeId: string): number {
+  const colonIdx = compositeId.lastIndexOf(':');
+  return colonIdx !== -1 ? Number(compositeId.slice(colonIdx + 1)) : Number(compositeId);
+}
+
+class TelegramWebhookBot implements PlatformBot {
+  readonly platform = 'telegram';
+  readonly applicationId: string;
+
+  private config: BotProviderConfig;
+  private context: BotPlatformRuntimeContext;
+
+  constructor(config: BotProviderConfig, context: BotPlatformRuntimeContext) {
+    this.config = config;
+    this.context = context;
+    this.applicationId = extractBotId(config.credentials.botToken);
+  }
+
+  // --- Lifecycle ---
+
+  async start(): Promise<void> {
+    log('Starting TelegramBot appId=%s', this.applicationId);
+
+    const baseUrl = (this.config.credentials.webhookProxyUrl || this.context.appUrl || '')
+      .trim()
+      .replace(/\/$/, '');
+    const webhookUrl = `${baseUrl}/api/agent/webhooks/telegram/${this.applicationId}`;
+    await setTelegramWebhook(
+      this.config.credentials.botToken,
+      webhookUrl,
+      this.config.credentials.secretToken,
+    );
+
+    log('TelegramBot appId=%s started, webhook=%s', this.applicationId, webhookUrl);
+  }
+
+  async stop(): Promise<void> {
+    log('Stopping TelegramBot appId=%s', this.applicationId);
+    try {
+      const response = await fetch(
+        `${TELEGRAM_API_BASE}/bot${this.config.credentials.botToken}/deleteWebhook`,
+        { method: 'POST' },
+      );
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to delete Telegram webhook: ${response.status} ${text}`);
+      }
+      log('TelegramBot appId=%s webhook deleted', this.applicationId);
+    } catch (error) {
+      log('Failed to delete webhook for appId=%s: %O', this.applicationId, error);
+    }
+  }
+
+  // --- Runtime Operations ---
+
+  createAdapter(): Record<string, any> {
+    return {
+      telegram: createTelegramAdapter({
+        botToken: this.config.credentials.botToken,
+        secretToken: this.config.credentials.secretToken,
+      }),
+    };
+  }
+
+  getMessenger(platformThreadId: string): PlatformMessenger {
+    const telegram = new TelegramPlatformClient(this.config.credentials.botToken);
+    const chatId = extractChatId(platformThreadId);
+    return {
+      createMessage: (content) => telegram.sendMessage(chatId, content).then(() => {}),
+      editMessage: (messageId, content) =>
+        telegram.editMessageText(chatId, parseTelegramMessageId(messageId), content),
+      removeReaction: (messageId) =>
+        telegram.removeMessageReaction(chatId, parseTelegramMessageId(messageId)),
+      triggerTyping: () => telegram.sendChatAction(chatId, 'typing'),
+    };
+  }
+
+  extractChatId(platformThreadId: string): string {
+    return extractChatId(platformThreadId);
+  }
+
+  parseMessageId(compositeId: string): number {
+    return parseTelegramMessageId(compositeId);
+  }
+}
+
+export const telegramBotFactory: PlatformBotFactory = (
+  account: BotProviderConfig,
+  context: BotPlatformRuntimeContext,
+): PlatformBot => {
+  return new TelegramWebhookBot(account, context);
+};
