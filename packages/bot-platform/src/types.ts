@@ -101,12 +101,6 @@ export interface PlatformClient {
 
   readonly id: string;
 
-  /**
-   * Called after the client is registered in BotMessageRouter.
-   * Discord: indexes client by token for gateway forwarding.
-   */
-  onRegistered?: (context: { registerByToken?: (token: string) => void }) => Promise<void>;
-
   /** Parse a composite message ID into the platform-native format. */
   parseMessageId: (compositeId: string) => string | number;
 
@@ -206,29 +200,9 @@ export interface PlatformDefinition {
   id: string;
 
   name: string;
-  // --- Webhook routing (optional) ---
-  resolveWebhook?: PlatformWebhookResolver;
 
   /** Strip platform-specific bot mention artifacts from user input text. */
   sanitizeUserInput?: (text: string, applicationId: string) => string;
 
   settings?: PlatformSettingsSchema;
 }
-
-// --------------- Webhook Resolver ---------------
-
-export interface RegisteredBotProviderConfig {
-  config: BotProviderConfig;
-  entry: PlatformDefinition;
-  runtimeKey: string;
-}
-
-export interface PlatformWebhookResolverContext {
-  params?: Record<string, string | undefined>;
-  registeredBots: RegisteredBotProviderConfig[];
-  request: Request;
-}
-
-export type PlatformWebhookResolver = (
-  context: PlatformWebhookResolverContext,
-) => Promise<RegisteredBotProviderConfig | undefined> | RegisteredBotProviderConfig | undefined;

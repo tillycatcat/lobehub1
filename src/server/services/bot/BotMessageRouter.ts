@@ -36,13 +36,13 @@ interface RegisteredBot {
  * Routes incoming webhook events to the correct Chat SDK Bot instance
  * and triggers message processing via AgentBridgeService.
  *
+ * All platforms require appId in the webhook URL:
+ *   POST /api/agent/webhooks/[platform]/[appId]
+ *
  * Bots are loaded on-demand: only the bot targeted by the incoming webhook
  * is created, not all bots across all platforms.
  */
 export class BotMessageRouter {
-  /** botToken → Chat instance (for Discord webhook routing via x-discord-gateway-token) */
-  private botInstancesByToken = new Map<string, Chat<any>>();
-
   /** "platform:applicationId" → registered bot */
   private bots = new Map<string, RegisteredBot>();
 
@@ -54,7 +54,7 @@ export class BotMessageRouter {
   // ------------------------------------------------------------------
 
   /**
-   * Get the webhook handler for a given platform.
+   * Get the webhook handler for a given platform + appId.
    * Returns a function compatible with Next.js Route Handler: `(req: Request) => Promise<Response>`
    */
   getWebhookHandler(platform: string, appId?: string): (req: Request) => Promise<Response> {
@@ -64,101 +64,20 @@ export class BotMessageRouter {
         return new Response('No bot configured for this platform', { status: 404 });
       }
 
-      // Use platform-specific resolver if available (e.g. Discord)
-      if (entry.resolveWebhook) {
-        return this.handleWithResolver(req, entry);
+      if (!appId) {
+        return new Response(`Missing appId for ${platform} webhook`, { status: 400 });
       }
 
-      // Direct lookup by appId
-      return this.handleGenericWebhook(req, platform, appId);
+      return this.handleWebhook(req, platform, appId);
     };
   }
 
   // ------------------------------------------------------------------
-  // Resolver-based webhook routing (Discord, etc.)
+  // Webhook handling
   // ------------------------------------------------------------------
 
-  private async handleWithResolver(req: Request, entry: PlatformDefinition): Promise<Response> {
-    const platform = entry.id;
-    const bodyBuffer = await req.arrayBuffer();
-    const clonedReq = this.cloneRequest(req, bodyBuffer);
-
-    // Collect all registered bots for this platform
-    const registeredBots = [...this.bots.entries()]
-      .filter(([key]) => key.startsWith(`${platform}:`))
-      .map(([runtimeKey, rb]) => ({
-        config: {
-          applicationId: rb.connector.applicationId,
-          credentials: {} as Record<string, string>, // credentials are not exposed
-          platform,
-          settings: {},
-        },
-        entry,
-        runtimeKey,
-      }));
-
-    // Try resolver with currently loaded bots
-    const resolved = await entry.resolveWebhook!({ registeredBots, request: clonedReq });
-
-    if (resolved) {
-      const bot = this.bots.get(resolved.runtimeKey);
-      if (bot?.chatBot.webhooks && platform in bot.chatBot.webhooks) {
-        return (bot.chatBot.webhooks as any)[platform](this.cloneRequest(req, bodyBuffer));
-      }
-    }
-
-    // If resolver didn't match, try to extract appId from payload and load on-demand
-    const appId = await this.extractAppIdFromPayload(platform, bodyBuffer);
-    if (appId) {
-      const bot = await this.getOrCreateBot(platform, appId);
-      if (bot?.chatBot.webhooks && platform in bot.chatBot.webhooks) {
-        return (bot.chatBot.webhooks as any)[platform](this.cloneRequest(req, bodyBuffer));
-      }
-    }
-
-    // Check gateway token for Discord forwarding
-    const gatewayToken = req.headers.get('x-discord-gateway-token');
-    if (gatewayToken) {
-      const tokenBot = this.botInstancesByToken.get(gatewayToken);
-      if (tokenBot?.webhooks && platform in tokenBot.webhooks) {
-        return (tokenBot.webhooks as any)[platform](this.cloneRequest(req, bodyBuffer));
-      }
-    }
-
-    return new Response(`No bot configured for ${platform}`, { status: 404 });
-  }
-
-  private async extractAppIdFromPayload(
-    platform: string,
-    bodyBuffer: ArrayBuffer,
-  ): Promise<string | undefined> {
-    try {
-      const payload = JSON.parse(new TextDecoder().decode(bodyBuffer));
-
-      // Discord: application_id in interaction payload
-      if (platform === 'discord') return payload.application_id;
-
-      // Other platforms can add extraction logic here
-      return undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  // ------------------------------------------------------------------
-  // Generic webhook routing (Telegram, Feishu, QQ, etc.)
-  // ------------------------------------------------------------------
-
-  private async handleGenericWebhook(
-    req: Request,
-    platform: string,
-    appId?: string,
-  ): Promise<Response> {
-    log('handleGenericWebhook: platform=%s, appId=%s', platform, appId);
-
-    if (!appId) {
-      return new Response(`Missing appId for ${platform} webhook`, { status: 400 });
-    }
+  private async handleWebhook(req: Request, platform: string, appId: string): Promise<Response> {
+    log('handleWebhook: platform=%s, appId=%s', platform, appId);
 
     const bot = await this.getOrCreateBot(platform, appId);
     if (!bot) {
@@ -170,14 +89,6 @@ export class BotMessageRouter {
     }
 
     return new Response(`No bot configured for ${platform}`, { status: 404 });
-  }
-
-  private cloneRequest(req: Request, body: ArrayBuffer): Request {
-    return new Request(req.url, {
-      body,
-      headers: req.headers,
-      method: req.method,
-    });
   }
 
   // ------------------------------------------------------------------
@@ -285,11 +196,6 @@ export class BotMessageRouter {
     };
 
     this.bots.set(key, registered);
-
-    // Platform-specific post-registration hook (e.g. Discord token index)
-    await connector.onRegistered?.({
-      registerByToken: (token: string) => this.botInstancesByToken.set(token, chatBot),
-    });
 
     return registered;
   }

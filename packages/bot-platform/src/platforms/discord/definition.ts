@@ -1,6 +1,5 @@
 import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
 import { DiscordAdapterFactory } from './client';
-import { discordWebhookResolver } from './resolveWebhook';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
@@ -68,5 +67,4 @@ export const discord: PlatformDefinition = {
   settings: settingsSchema,
 
   adapterFactory: new DiscordAdapterFactory(),
-  resolveWebhook: discordWebhookResolver,
 };

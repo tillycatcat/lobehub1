@@ -61,7 +61,6 @@ vi.mock('../AgentBridgeService', () => ({
 const mockCreateAdapter = vi.hoisted(() =>
   vi.fn().mockReturnValue({ testplatform: { type: 'mock-adapter' } }),
 );
-const mockOnRegistered = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('../platforms', () => ({
   getDefinition: vi.fn().mockImplementation((platform: string) => {
@@ -79,7 +78,6 @@ vi.mock('../platforms', () => ({
             triggerTyping: vi.fn(),
           }),
           id: platform,
-          onRegistered: mockOnRegistered,
           parseMessageId: (id: string) => id,
           start: vi.fn(),
           stop: vi.fn(),
@@ -154,7 +152,6 @@ describe('BotMessageRouter', () => {
       // Chat SDK should be initialized
       expect(mockInitialize).toHaveBeenCalled();
       expect(mockCreateAdapter).toHaveBeenCalled();
-      expect(mockOnRegistered).toHaveBeenCalled();
     });
 
     it('should return cached bot on subsequent requests', async () => {

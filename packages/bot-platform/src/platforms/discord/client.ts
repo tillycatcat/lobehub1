@@ -82,7 +82,7 @@ class DiscordGatewayClient implements PlatformClient {
     const durationMs = options?.durationMs ?? DEFAULT_DURATION_MS;
     const waitUntil = options?.waitUntil ?? ((task: Promise<any>) => task.catch(() => {}));
 
-    const webhookUrl = `${(this.context.appUrl || '').trim()}/api/agent/webhooks/discord`;
+    const webhookUrl = `${(this.context.appUrl || '').trim()}/api/agent/webhooks/discord/${this.applicationId}`;
 
     await discordAdapter.startGatewayListener(
       { waitUntil },
@@ -168,12 +168,6 @@ class DiscordGatewayClient implements PlatformClient {
     // Only auto-subscribe to actual threads (4-part ID), not top-level channels (3-part ID).
     const parts = threadId.split(':');
     return parts.length >= 4;
-  }
-
-  async onRegistered(context: { registerByToken?: (token: string) => void }): Promise<void> {
-    if (this.config.credentials.botToken && context.registerByToken) {
-      context.registerByToken(this.config.credentials.botToken);
-    }
   }
 }
 

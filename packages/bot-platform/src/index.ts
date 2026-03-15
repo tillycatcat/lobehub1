@@ -12,9 +12,6 @@ export type {
   PlatformMessenger,
   PlatformSettingsSchema,
   PlatformSettingsSchemaProperty,
-  PlatformWebhookResolver,
-  PlatformWebhookResolverContext,
-  RegisteredBotProviderConfig,
   UsageStats,
   ValidationResult,
 } from './types';
