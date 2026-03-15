@@ -1,13 +1,13 @@
 import { createTelegramAdapter } from '@chat-adapter/telegram';
 import debug from 'debug';
 
-import type {
-  AdapterFactory,
-  BotPlatformRuntimeContext,
-  BotProviderConfig,
-  PlatformClient,
-  PlatformMessenger,
-  ValidationResult,
+import {
+  type BotPlatformRuntimeContext,
+  type BotProviderConfig,
+  ClientFactory,
+  type PlatformClient,
+  type PlatformMessenger,
+  type ValidationResult,
 } from '../types';
 import { TELEGRAM_API_BASE, TelegramApi } from './api';
 import { extractBotId, setTelegramWebhook } from './helpers';
@@ -104,7 +104,7 @@ class TelegramWebhookClient implements PlatformClient {
   }
 }
 
-export class TelegramAdapterFactory implements AdapterFactory {
+export class TelegramClientFactory extends ClientFactory {
   createClient(config: BotProviderConfig, context: BotPlatformRuntimeContext): PlatformClient {
     return new TelegramWebhookClient(config, context);
   }

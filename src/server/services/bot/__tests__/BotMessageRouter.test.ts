@@ -66,7 +66,7 @@ const mockGetPlatform = vi.hoisted(() =>
   vi.fn().mockImplementation((platform: string) => {
     if (platform === 'unknown') return undefined;
     return {
-      adapterFactory: {
+      clientFactory: {
         createClient: vi.fn().mockReturnValue({
           applicationId: 'mock-app',
           createAdapter: mockCreateAdapter,

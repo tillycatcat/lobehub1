@@ -29,7 +29,7 @@ interface ResolvedAgentInfo {
 interface RegisteredBot {
   agentInfo: ResolvedAgentInfo;
   chatBot: Chat<any>;
-  connector: PlatformClient;
+  client: PlatformClient;
 }
 
 /**
@@ -176,11 +176,11 @@ export class BotMessageRouter {
       redisClient: getAgentRuntimeRedisClient() as any,
     };
 
-    const connector = entry.adapterFactory.createClient(providerConfig, runtimeContext);
-    const adapters = connector.createAdapter();
+    const client = entry.clientFactory.createClient(providerConfig, runtimeContext);
+    const adapters = client.createAdapter();
 
     const chatBot = this.createChatBot(adapters, `agent-${agentId}`);
-    this.registerHandlers(chatBot, serverDB, connector, {
+    this.registerHandlers(chatBot, serverDB, client, {
       agentId,
       applicationId,
       platform,
@@ -192,7 +192,7 @@ export class BotMessageRouter {
     const registered: RegisteredBot = {
       agentInfo: { agentId, userId },
       chatBot,
-      connector,
+      client,
     };
 
     this.bots.set(key, registered);
@@ -262,7 +262,7 @@ export class BotMessageRouter {
   private registerHandlers(
     bot: Chat<any>,
     serverDB: LobeChatDatabase,
-    connector: PlatformClient,
+    client: PlatformClient,
     info: ResolvedAgentInfo & {
       applicationId: string;
       platform: string;
@@ -283,7 +283,7 @@ export class BotMessageRouter {
       await bridge.handleMention(thread, message, {
         agentId,
         botContext: { applicationId, platform, platformThreadId: thread.id },
-        connector,
+        client,
       });
     });
 
@@ -301,7 +301,7 @@ export class BotMessageRouter {
       await bridge.handleSubscribedMessage(thread, message, {
         agentId,
         botContext: { applicationId, platform, platformThreadId: thread.id },
-        connector,
+        client,
       });
     });
 
@@ -323,7 +323,7 @@ export class BotMessageRouter {
         await bridge.handleMention(thread, message, {
           agentId,
           botContext: { applicationId, platform, platformThreadId: thread.id },
-          connector,
+          client,
         });
       });
     }

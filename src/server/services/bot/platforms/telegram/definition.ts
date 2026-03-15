@@ -1,5 +1,5 @@
 import type { PlatformDefinition, PlatformSettingsSchema } from '../types';
-import { TelegramAdapterFactory } from './client';
+import { TelegramClientFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
@@ -62,5 +62,5 @@ export const telegram: PlatformDefinition = {
   ],
   settings: settingsSchema,
 
-  adapterFactory: new TelegramAdapterFactory(),
+  clientFactory: new TelegramClientFactory(),
 };

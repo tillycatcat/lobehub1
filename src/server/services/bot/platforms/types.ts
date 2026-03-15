@@ -147,28 +147,11 @@ export interface BotPlatformRuntimeContext {
   registerByToken?: (token: string) => void;
 }
 
-// --------------- Adapter Factory ---------------
+// --------------- Validation ---------------
 
 export interface ValidationResult {
   errors?: Array<{ field: string; message: string }>;
   valid: boolean;
-}
-
-/**
- * Factory for creating PlatformClient instances with credential validation.
- *
- * Each platform implements this as a class (e.g. `new FeishuAdapterFactory()`).
- * Wraps chat-sdk adapter creation with validation and lifecycle management.
- */
-export interface AdapterFactory {
-  /** Create a PlatformClient instance for this platform. */
-  createClient: (config: BotProviderConfig, context: BotPlatformRuntimeContext) => PlatformClient;
-
-  /** Validate credentials before bot creation (e.g. verify token with platform API). */
-  validateCredentials?: (
-    credentials: Record<string, string>,
-    settings?: Record<string, unknown>,
-  ) => Promise<ValidationResult>;
 }
 
 // --------------- Platform Documentation ---------------
@@ -180,29 +163,71 @@ export interface PlatformDocumentation {
   setupGuideUrl?: string;
 }
 
+// --------------- Client Factory ---------------
+
+/**
+ * Abstract base class for creating PlatformClient instances.
+ *
+ * - `createClient` (abstract): instantiate a PlatformClient (e.g. based on connectionMode)
+ * - `validateCredentials`: verify credentials against the platform API — called from UI flow only
+ * - `validateSettings`: validate platform-specific settings — called from UI flow only
+ */
+export abstract class ClientFactory {
+  /** Create a PlatformClient instance. Fast and sync — no network calls. */
+  abstract createClient(
+    config: BotProviderConfig,
+    context: BotPlatformRuntimeContext,
+  ): PlatformClient;
+
+  /**
+   * Verify credentials against the platform API.
+   * Called explicitly from the UI/API layer when the user saves credentials.
+   */
+  async validateCredentials(
+    _credentials: Record<string, string>,
+    _settings?: Record<string, unknown>,
+  ): Promise<ValidationResult> {
+    return { valid: true };
+  }
+
+  /**
+   * Validate platform-specific settings.
+   * Called explicitly from the UI/API layer when the user saves settings.
+   */
+  async validateSettings(_settings: Record<string, unknown>): Promise<ValidationResult> {
+    return { valid: true };
+  }
+}
+
 // --------------- Platform Definition ---------------
 
 /**
- * A platform definition, uniquely identified by `platform`.
+ * A platform definition, uniquely identified by `id`.
  *
- * Contains metadata + factory. All runtime operations go through PlatformClient.
+ * Contains metadata, factory, and validation. All runtime operations go through PlatformClient.
  */
 export interface PlatformDefinition {
-  // --- Factory ---
-  adapterFactory: AdapterFactory;
-  // --- Schemas (for frontend UI) ---
+  /** Factory for creating PlatformClient instances and validating credentials/settings. */
+  clientFactory: ClientFactory;
+
+  /** The credentials required for the platform. */
   credentials: CredentialField[];
 
+  /** The description of the platform. */
   description?: string;
+
   /** Documentation links for the platform */
   documentation?: PlatformDocumentation;
 
+  /** The unique identifier of the platform. */
   id: string;
 
+  /** The name of the platform. */
   name: string;
 
   /** Strip platform-specific bot mention artifacts from user input text. */
   sanitizeUserInput?: (text: string, applicationId: string) => string;
 
+  /** The settings schema required for the platform. */
   settings?: PlatformSettingsSchema;
 }

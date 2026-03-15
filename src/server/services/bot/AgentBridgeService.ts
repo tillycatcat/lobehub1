@@ -80,7 +80,7 @@ interface ThreadState {
 interface BridgeHandlerOpts {
   agentId: string;
   botContext?: ChatTopicBotContext;
-  connector?: PlatformClient;
+  client?: PlatformClient;
 }
 
 /**
@@ -246,14 +246,14 @@ export class AgentBridgeService {
     AgentBridgeService.activeThreads.add(thread.id);
 
     // Immediate feedback: mark as received + show typing
-    const { connector } = opts;
+    const { client } = opts;
     await safeReaction(
       () => thread.adapter.addReaction(thread.id, message.id, RECEIVED_EMOJI),
       'add eyes',
     );
 
     // Auto-subscribe to thread (platforms can opt out, e.g. Discord top-level channels)
-    const subscribe = connector?.shouldSubscribe?.(thread.id) ?? true;
+    const subscribe = client?.shouldSubscribe?.(thread.id) ?? true;
     if (subscribe) {
       await thread.subscribe();
     }
@@ -277,7 +277,7 @@ export class AgentBridgeService {
         agentId,
         botContext,
         channelContext,
-        connector,
+        client,
         trigger: 'bot',
       });
 
@@ -374,7 +374,7 @@ export class AgentBridgeService {
         agentId,
         botContext,
         channelContext,
-        connector: opts.connector,
+        client: opts.client,
         topicId,
         trigger: 'bot',
       });
@@ -413,7 +413,7 @@ export class AgentBridgeService {
       agentId: string;
       botContext?: ChatTopicBotContext;
       channelContext?: DiscordChannelContext;
-      connector?: PlatformClient;
+      client?: PlatformClient;
       topicId?: string;
       trigger?: string;
     },
@@ -527,12 +527,12 @@ export class AgentBridgeService {
       agentId: string;
       botContext?: ChatTopicBotContext;
       channelContext?: DiscordChannelContext;
-      connector?: PlatformClient;
+      client?: PlatformClient;
       topicId?: string;
       trigger?: string;
     },
   ): Promise<{ reply: string; topicId: string }> {
-    const { agentId, botContext, channelContext, connector, topicId, trigger } = opts;
+    const { agentId, botContext, channelContext, client, topicId, trigger } = opts;
 
     const aiAgentService = new AiAgentService(this.db, this.userId);
     const timezone = await this.loadTimezone();
@@ -605,7 +605,7 @@ export class AgentBridgeService {
                 totalCost: stepData.totalCost ?? 0,
                 totalTokens: stepData.totalTokens ?? 0,
               };
-              const progressText = connector?.formatReply?.(msgBody, stats) ?? msgBody;
+              const progressText = client?.formatReply?.(msgBody, stats) ?? msgBody;
 
               if (content) lastLLMContent = content;
               if (toolsCalling) lastToolsCalling = toolsCalling;
@@ -653,7 +653,7 @@ export class AgentBridgeService {
                     totalCost: finalState.cost?.total ?? 0,
                     totalTokens: finalState.usage?.llm?.tokens?.total ?? 0,
                   };
-                  const finalText = connector?.formatReply?.(replyBody, replyStats) ?? replyBody;
+                  const finalText = client?.formatReply?.(replyBody, replyStats) ?? replyBody;
 
                   // TODO: resolve charLimit from settings when entry-based registry is wired
                   const chunks = splitMessage(finalText);

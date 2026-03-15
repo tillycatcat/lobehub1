@@ -2,14 +2,14 @@ import type { DiscordAdapter } from '@chat-adapter/discord';
 import { createDiscordAdapter } from '@chat-adapter/discord';
 import debug from 'debug';
 
-import type {
-  AdapterFactory,
-  BotPlatformRuntimeContext,
-  BotProviderConfig,
-  PlatformClient,
-  PlatformMessenger,
-  UsageStats,
-  ValidationResult,
+import {
+  type BotPlatformRuntimeContext,
+  type BotProviderConfig,
+  ClientFactory,
+  type PlatformClient,
+  type PlatformMessenger,
+  type UsageStats,
+  type ValidationResult,
 } from '../types';
 import { formatUsageStats } from '../utils';
 import { DiscordApi } from './api';
@@ -171,8 +171,9 @@ class DiscordGatewayClient implements PlatformClient {
   }
 }
 
-export class DiscordAdapterFactory implements AdapterFactory {
+export class DiscordClientFactory extends ClientFactory {
   createClient(config: BotProviderConfig, context: BotPlatformRuntimeContext): PlatformClient {
+    // TODO: use config.settings.connectionMode to choose between gateway and webhook client
     return new DiscordGatewayClient(config, context);
   }
 

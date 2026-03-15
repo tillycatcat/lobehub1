@@ -7,10 +7,10 @@ import type {
 } from './types';
 
 /**
- * Platform registry — manages all platform definitions and adapter factories.
+ * Platform registry — manages all platform definitions.
  *
  * Integrates with chat-sdk's Chat class by providing adapter creation
- * and credential validation through the registered AdapterFactory instances.
+ * and credential validation through the registered platform definitions.
  */
 export class PlatformRegistry {
   private platforms = new Map<string, PlatformDefinition>();
@@ -37,7 +37,7 @@ export class PlatformRegistry {
   /**
    * Create a PlatformClient for a given platform.
    *
-   * Looks up the platform definition and delegates to its adapterFactory.
+   * Looks up the platform definition and delegates to its createClient.
    * Throws if the platform is not registered.
    */
   createClient(
@@ -49,14 +49,13 @@ export class PlatformRegistry {
     if (!definition) {
       throw new Error(`Platform "${platform}" is not registered`);
     }
-    return definition.adapterFactory.createClient(config, context ?? {});
+    return definition.clientFactory.createClient(config, context ?? {});
   }
 
   /**
    * Validate credentials for a given platform.
    *
-   * Delegates to the platform's adapterFactory.validateCredentials if available.
-   * Returns `{ valid: true }` if the platform does not implement validation.
+   * Delegates to the platform's clientFactory.validateCredentials.
    */
   async validateCredentials(
     platform: string,
@@ -70,9 +69,6 @@ export class PlatformRegistry {
         valid: false,
       };
     }
-    if (!definition.adapterFactory.validateCredentials) {
-      return { valid: true };
-    }
-    return definition.adapterFactory.validateCredentials(credentials, settings);
+    return definition.clientFactory.validateCredentials(credentials, settings);
   }
 }

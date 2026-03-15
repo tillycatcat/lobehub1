@@ -1,5 +1,5 @@
 import type { PlatformDefinition, PlatformSettingsSchema } from '../types';
-import { QQAdapterFactory } from './client';
+import { QQClientFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
@@ -49,5 +49,5 @@ export const qq: PlatformDefinition = {
   ],
   settings: settingsSchema,
 
-  adapterFactory: new QQAdapterFactory(),
+  clientFactory: new QQClientFactory(),
 };

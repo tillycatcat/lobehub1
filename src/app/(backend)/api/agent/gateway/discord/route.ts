@@ -22,7 +22,7 @@ function createDiscordBot(applicationId: string, credentials: Record<string, str
     platform: 'discord',
     settings: {},
   };
-  return discord.adapterFactory.createClient(config, {});
+  return discord.clientFactory.createClient(config, {});
 }
 
 async function processConnectQueue(remainingMs: number): Promise<number> {

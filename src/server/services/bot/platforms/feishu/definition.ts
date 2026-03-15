@@ -1,5 +1,5 @@
 import type { PlatformDefinition, PlatformSettingsSchema } from '../types';
-import { FeishuAdapterFactory } from './client';
+import { FeishuClientFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
@@ -71,5 +71,5 @@ export const feishu: PlatformDefinition = {
   ],
   settings: settingsSchema,
 
-  adapterFactory: new FeishuAdapterFactory(),
+  clientFactory: new FeishuClientFactory(),
 };

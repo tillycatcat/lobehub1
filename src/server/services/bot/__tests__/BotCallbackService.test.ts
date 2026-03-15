@@ -75,7 +75,7 @@ vi.mock('../platforms', () => ({
     getPlatform: vi.fn().mockImplementation((platform: string) => {
       if (platform === 'unknown') return undefined;
       return {
-        adapterFactory: { createClient: mockCreateBot },
+        clientFactory: { createClient: mockCreateBot },
         credentials: [],
         name: platform,
         id: platform,

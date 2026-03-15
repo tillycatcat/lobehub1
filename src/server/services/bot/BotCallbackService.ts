@@ -62,16 +62,16 @@ export class BotCallbackService {
     const { type, applicationId, platformThreadId, progressMessageId } = body;
     const platform = platformThreadId.split(':')[0];
 
-    const { connector, messenger, charLimit } = await this.createMessenger(
+    const { client, messenger, charLimit } = await this.createMessenger(
       platform,
       applicationId,
       platformThreadId,
     );
 
     if (type === 'step') {
-      await this.handleStep(body, messenger, progressMessageId, connector);
+      await this.handleStep(body, messenger, progressMessageId, client);
     } else if (type === 'completion') {
-      await this.handleCompletion(body, messenger, progressMessageId, connector, charLimit);
+      await this.handleCompletion(body, messenger, progressMessageId, client, charLimit);
       await this.removeEyesReaction(body, messenger);
       this.summarizeTopicTitle(body, messenger);
     }
@@ -81,7 +81,7 @@ export class BotCallbackService {
     platform: string,
     applicationId: string,
     platformThreadId: string,
-  ): Promise<{ charLimit?: number; messenger: PlatformMessenger; connector: PlatformClient }> {
+  ): Promise<{ charLimit?: number; messenger: PlatformMessenger; client: PlatformClient }> {
     const row = await AgentBotProviderModel.findByPlatformAndAppId(
       this.db,
       platform,
@@ -115,17 +115,17 @@ export class BotCallbackService {
       settings: settings || {},
     };
 
-    const connector = entry.adapterFactory.createClient(config, {});
-    const messenger = connector.getMessenger(platformThreadId);
+    const client = entry.clientFactory.createClient(config, {});
+    const messenger = client.getMessenger(platformThreadId);
 
-    return { charLimit, messenger, connector };
+    return { charLimit, messenger, client };
   }
 
   private async handleStep(
     body: BotCallbackBody,
     messenger: PlatformMessenger,
     progressMessageId: string,
-    connector: PlatformClient,
+    client: PlatformClient,
   ): Promise<void> {
     if (!body.shouldContinue) return;
 
@@ -154,7 +154,7 @@ export class BotCallbackService {
       totalTokens: body.totalTokens ?? 0,
     };
 
-    const progressText = connector.formatReply?.(msgBody, stats) ?? msgBody;
+    const progressText = client.formatReply?.(msgBody, stats) ?? msgBody;
 
     const isLlmFinalResponse =
       body.stepType === 'call_llm' && !body.toolsCalling?.length && body.content;
@@ -173,7 +173,7 @@ export class BotCallbackService {
     body: BotCallbackBody,
     messenger: PlatformMessenger,
     progressMessageId: string,
-    connector: PlatformClient,
+    client: PlatformClient,
     charLimit?: number,
   ): Promise<void> {
     const { reason, lastAssistantContent, errorMessage } = body;
@@ -203,7 +203,7 @@ export class BotCallbackService {
       totalTokens: body.totalTokens ?? 0,
     };
 
-    const finalText = connector.formatReply?.(msgBody, stats) ?? msgBody;
+    const finalText = client.formatReply?.(msgBody, stats) ?? msgBody;
     const chunks = splitMessage(finalText, charLimit);
 
     try {

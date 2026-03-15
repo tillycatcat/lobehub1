@@ -1,13 +1,13 @@
 import { createLarkAdapter, LarkApiClient } from '@lobechat/chat-adapter-feishu';
 import debug from 'debug';
 
-import type {
-  AdapterFactory,
-  BotPlatformRuntimeContext,
-  BotProviderConfig,
-  PlatformClient,
-  PlatformMessenger,
-  ValidationResult,
+import {
+  type BotPlatformRuntimeContext,
+  type BotProviderConfig,
+  ClientFactory,
+  type PlatformClient,
+  type PlatformMessenger,
+  type ValidationResult,
 } from '../types';
 
 const log = debug('bot-platform:feishu:client');
@@ -92,7 +92,7 @@ class FeishuWebhookClient implements PlatformClient {
   }
 }
 
-export class FeishuAdapterFactory implements AdapterFactory {
+export class FeishuClientFactory extends ClientFactory {
   createClient(config: BotProviderConfig, context: BotPlatformRuntimeContext): PlatformClient {
     return new FeishuWebhookClient(config, context);
   }

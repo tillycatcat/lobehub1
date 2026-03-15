@@ -29,8 +29,8 @@ vi.mock('@/server/modules/KeyVaultsEncrypt', () => ({
 
 // Fake platform definition for testing
 const fakeDefinition: PlatformDefinition = {
-  adapterFactory: {
-    createClient: (config) => ({
+  clientFactory: {
+    createClient: (config: any) => ({
       applicationId: config.applicationId,
       createAdapter: () => ({}),
       extractChatId: (id: string) => id,
@@ -45,11 +45,13 @@ const fakeDefinition: PlatformDefinition = {
       start: vi.fn().mockResolvedValue(undefined),
       stop: vi.fn().mockResolvedValue(undefined),
     }),
+    validateCredentials: async () => ({ valid: true }),
+    validateSettings: async () => ({ valid: true }),
   },
   credentials: [],
   name: 'Fake Platform',
   id: 'fakeplatform',
-};
+} as any;
 
 const FAKE_DB = {} as any;
 const FAKE_GATEKEEPER = { decrypt: vi.fn() };
@@ -130,15 +132,15 @@ describe('GatewayManager', () => {
     });
   });
 
-  describe('startBot', () => {
+  describe('startClient', () => {
     it('should handle missing provider gracefully', async () => {
       await manager.start();
 
-      await expect(manager.startBot('fakeplatform', 'app-1', 'user-1')).resolves.toBeUndefined();
+      await expect(manager.startClient('fakeplatform', 'app-1', 'user-1')).resolves.toBeUndefined();
     });
   });
 
-  describe('stopBot', () => {
+  describe('stopClient', () => {
     it('should stop a specific bot', async () => {
       mockFindEnabledByPlatform.mockResolvedValue([
         {
@@ -148,14 +150,14 @@ describe('GatewayManager', () => {
       ]);
 
       await manager.start();
-      await manager.stopBot('fakeplatform', 'app-1');
+      await manager.stopClient('fakeplatform', 'app-1');
 
       expect(manager.isRunning).toBe(true);
     });
 
     it('should handle stopping non-existent bot gracefully', async () => {
       await manager.start();
-      await expect(manager.stopBot('fakeplatform', 'non-existent')).resolves.toBeUndefined();
+      await expect(manager.stopClient('fakeplatform', 'non-existent')).resolves.toBeUndefined();
     });
   });
 

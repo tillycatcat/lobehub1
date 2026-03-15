@@ -46,16 +46,21 @@ const createMockBot = (): PlatformClient => ({
   stop: vi.fn().mockResolvedValue(undefined),
 });
 
-// Helper: create a fake definition with a factory that returns the given bot
+// Helper: create a fake definition that returns the given bot
 const createFakeDefinition = (
   id: string,
   factoryFn?: (...args: any[]) => PlatformClient,
-): PlatformDefinition => ({
-  adapterFactory: { createClient: factoryFn || (() => createMockBot()) },
-  credentials: [],
-  name: id,
-  id,
-});
+): PlatformDefinition =>
+  ({
+    clientFactory: {
+      createClient: factoryFn || (() => createMockBot()),
+      validateCredentials: async () => ({ valid: true }),
+      validateSettings: async () => ({ valid: true }),
+    },
+    credentials: [],
+    name: id,
+    id,
+  }) as any;
 
 describe('GatewayManager', () => {
   let mockDb: any;
@@ -159,7 +164,7 @@ describe('GatewayManager', () => {
       const mockBot2 = createMockBot();
       const factory = vi.fn().mockReturnValueOnce(mockBot1).mockReturnValueOnce(mockBot2);
 
-      // Pre-load two bots by calling startBot
+      // Pre-load two bots by calling startClient
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue({
         applicationId: 'app-1',
         credentials: { token: 'tok1' },
@@ -168,8 +173,8 @@ describe('GatewayManager', () => {
       const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
       await manager.start();
 
-      await manager.startBot('slack', 'app-1', 'user-1');
-      await manager.startBot('slack', 'app-2', 'user-2');
+      await manager.startClient('slack', 'app-1', 'user-1');
+      await manager.startClient('slack', 'app-2', 'user-2');
 
       await manager.stop();
 
@@ -179,14 +184,14 @@ describe('GatewayManager', () => {
     });
   });
 
-  describe('startBot', () => {
+  describe('startClient', () => {
     it('should do nothing when no provider is found in DB', async () => {
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue(null);
       const factory = vi.fn();
 
       const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
-      await manager.startBot('slack', 'app-123', 'user-abc');
+      await manager.startClient('slack', 'app-123', 'user-abc');
 
       expect(factory).not.toHaveBeenCalled();
     });
@@ -199,7 +204,7 @@ describe('GatewayManager', () => {
 
       const manager = new GatewayManager({ definitions: [] }); // empty definitions
 
-      await manager.startBot('unsupported', 'app-123', 'user-abc');
+      await manager.startClient('unsupported', 'app-123', 'user-abc');
 
       // No bot should be created
       expect(vi.mocked(AgentBotProviderModel)).toHaveBeenCalled();
@@ -215,7 +220,7 @@ describe('GatewayManager', () => {
 
       const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
-      await manager.startBot('slack', 'app-123', 'user-abc');
+      await manager.startClient('slack', 'app-123', 'user-abc');
 
       expect(factory).toHaveBeenCalled();
       expect(mockBot.start).toHaveBeenCalled();
@@ -234,22 +239,22 @@ describe('GatewayManager', () => {
       const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
       // Start bot first time
-      await manager.startBot('slack', 'app-123', 'user-abc');
+      await manager.startClient('slack', 'app-123', 'user-abc');
       expect(mockBot1.start).toHaveBeenCalled();
 
       // Start bot second time for same key — should stop first
-      await manager.startBot('slack', 'app-123', 'user-abc');
+      await manager.startClient('slack', 'app-123', 'user-abc');
       expect(mockBot1.stop).toHaveBeenCalled();
       expect(mockBot2.start).toHaveBeenCalled();
     });
   });
 
-  describe('stopBot', () => {
+  describe('stopClient', () => {
     it('should do nothing when bot is not found', async () => {
       const manager = new GatewayManager({ definitions: [] });
 
       // Should not throw
-      await expect(manager.stopBot('slack', 'app-123')).resolves.toBeUndefined();
+      await expect(manager.stopClient('slack', 'app-123')).resolves.toBeUndefined();
     });
 
     it('should stop and remove a running bot', async () => {
@@ -263,11 +268,11 @@ describe('GatewayManager', () => {
       const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
       // First start the bot
-      await manager.startBot('slack', 'app-123', 'user-abc');
+      await manager.startClient('slack', 'app-123', 'user-abc');
       expect(mockBot.start).toHaveBeenCalled();
 
       // Then stop it
-      await manager.stopBot('slack', 'app-123');
+      await manager.stopClient('slack', 'app-123');
       expect(mockBot.stop).toHaveBeenCalled();
     });
 
@@ -282,10 +287,10 @@ describe('GatewayManager', () => {
 
       const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
-      await manager.startBot('slack', 'app-1', 'user-1');
-      await manager.startBot('slack', 'app-2', 'user-2');
+      await manager.startClient('slack', 'app-1', 'user-1');
+      await manager.startClient('slack', 'app-2', 'user-2');
 
-      await manager.stopBot('slack', 'app-1');
+      await manager.stopClient('slack', 'app-1');
 
       expect(mockBot1.stop).toHaveBeenCalled();
       expect(mockBot2.stop).not.toHaveBeenCalled();

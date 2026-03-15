@@ -8,7 +8,6 @@ import { telegram } from './telegram/definition';
 
 export { PlatformRegistry } from './registry';
 export type {
-  AdapterFactory,
   BotPlatformRedisClient,
   BotPlatformRuntimeContext,
   BotProviderConfig,
@@ -22,6 +21,7 @@ export type {
   UsageStats,
   ValidationResult,
 } from './types';
+export { ClientFactory } from './types';
 export {
   buildRuntimeKey,
   formatDuration,

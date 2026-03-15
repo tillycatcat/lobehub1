@@ -4,9 +4,17 @@ import { PlatformRegistry } from './registry';
 import { buildRuntimeKey, parseRuntimeKey } from './utils';
 
 describe('PlatformRegistry', () => {
-  const fakeDef = (id: string, factory?: any) =>
+  const fakeFactory = (overrides?: any) => ({
+    createClient: vi.fn(),
+    validateCredentials: vi.fn().mockResolvedValue({ valid: true }),
+    validateSettings: vi.fn().mockResolvedValue({ valid: true }),
+    ...overrides,
+  });
+
+  const fakeDef = (id: string, overrides?: any) =>
     ({
-      adapterFactory: factory || { createClient: vi.fn() },
+      clientFactory: fakeFactory(overrides?.clientFactory),
+      ...overrides,
       id,
     }) as any;
 
@@ -46,17 +54,17 @@ describe('PlatformRegistry', () => {
   });
 
   describe('createClient', () => {
-    it('should delegate to adapterFactory.createClient', () => {
+    it('should delegate to definition.clientFactory.createClient', () => {
       const mockClient = { id: 'test' };
-      const mockFactory = { createClient: vi.fn().mockReturnValue(mockClient) };
+      const mockCreateClient = vi.fn().mockReturnValue(mockClient);
       const registry = new PlatformRegistry();
-      registry.register(fakeDef('test', mockFactory));
+      registry.register(fakeDef('test', { clientFactory: { createClient: mockCreateClient } }));
 
       const config = { applicationId: 'app-1', credentials: {}, platform: 'test', settings: {} };
       const result = registry.createClient('test', config);
 
       expect(result).toBe(mockClient);
-      expect(mockFactory.createClient).toHaveBeenCalledWith(config, {});
+      expect(mockCreateClient).toHaveBeenCalledWith(config, {});
     });
 
     it('should throw for unknown platform', () => {
@@ -68,26 +76,15 @@ describe('PlatformRegistry', () => {
   });
 
   describe('validateCredentials', () => {
-    it('should delegate to adapterFactory.validateCredentials', async () => {
-      const mockFactory = {
-        createClient: vi.fn(),
-        validateCredentials: vi.fn().mockResolvedValue({ valid: true }),
-      };
+    it('should delegate to definition.clientFactory.validateCredentials', async () => {
+      const mockValidate = vi.fn().mockResolvedValue({ valid: true });
       const registry = new PlatformRegistry();
-      registry.register(fakeDef('test', mockFactory));
+      registry.register(fakeDef('test', { clientFactory: { validateCredentials: mockValidate } }));
 
       const result = await registry.validateCredentials('test', { token: 'abc' });
 
       expect(result).toEqual({ valid: true });
-      expect(mockFactory.validateCredentials).toHaveBeenCalledWith({ token: 'abc' }, undefined);
-    });
-
-    it('should return valid when factory has no validateCredentials', async () => {
-      const registry = new PlatformRegistry();
-      registry.register(fakeDef('test', { createClient: vi.fn() }));
-
-      const result = await registry.validateCredentials('test', { token: 'abc' });
-      expect(result).toEqual({ valid: true });
+      expect(mockValidate).toHaveBeenCalledWith({ token: 'abc' }, undefined);
     });
 
     it('should return error for unknown platform', async () => {
