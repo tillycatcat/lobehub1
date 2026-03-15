@@ -102,8 +102,7 @@ describe('PlatformRegistry', () => {
 
 describe('buildRuntimeKey', () => {
   it('should build a runtime key from entry and applicationId', () => {
-    const entry = { id: 'telegram' } as any;
-    expect(buildRuntimeKey(entry, 'bot-123')).toBe('telegram:bot-123');
+    expect(buildRuntimeKey('telegram', 'bot-123')).toBe('telegram:bot-123');
   });
 });
 
@@ -116,8 +115,7 @@ describe('parseRuntimeKey', () => {
   });
 
   it('should roundtrip with buildRuntimeKey', () => {
-    const entry = { id: 'feishu' } as any;
-    const key = buildRuntimeKey(entry, 'my-app');
+    const key = buildRuntimeKey('feishu', 'my-app');
     expect(parseRuntimeKey(key)).toEqual({
       applicationId: 'my-app',
       platform: 'feishu',

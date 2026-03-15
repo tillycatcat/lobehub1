@@ -1,4 +1,9 @@
-import type { BotProviderConfig, PlatformClient, PlatformDefinition } from '@lobechat/bot-platform';
+import {
+  type BotProviderConfig,
+  buildRuntimeKey,
+  type PlatformClient,
+  type PlatformDefinition,
+} from '@lobechat/bot-platform';
 import debug from 'debug';
 
 import { getServerDB } from '@/database/core/db-adaptor';
@@ -67,7 +72,7 @@ export class GatewayManager {
   // ------------------------------------------------------------------
 
   async startBot(platform: string, applicationId: string, userId: string): Promise<void> {
-    const key = `${platform}:${applicationId}`;
+    const key = buildRuntimeKey(platform, applicationId);
 
     // Stop existing if any
     const existing = this.bots.get(key);
@@ -100,7 +105,7 @@ export class GatewayManager {
   }
 
   async stopBot(platform: string, applicationId: string): Promise<void> {
-    const key = `${platform}:${applicationId}`;
+    const key = buildRuntimeKey(platform, applicationId);
     const bot = this.bots.get(key);
     if (!bot) return;
 
@@ -138,7 +143,7 @@ export class GatewayManager {
 
     for (const provider of providers) {
       const { applicationId, credentials } = provider;
-      const key = `${platform}:${applicationId}`;
+      const key = buildRuntimeKey(platform, applicationId);
       activeKeys.add(key);
 
       log('Sync: processing provider %s, hasCredentials=%s', key, !!credentials);

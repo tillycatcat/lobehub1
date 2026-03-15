@@ -93,8 +93,8 @@ export class PlatformRegistry {
  * Build a runtime key for a registered bot instance.
  * Format: `platform:applicationId`
  */
-export function buildRuntimeKey(entry: PlatformDefinition, applicationId: string): string {
-  return `${entry.id}:${applicationId}`;
+export function buildRuntimeKey(platform: string, applicationId: string): string {
+  return `${platform}:${applicationId}`;
 }
 
 /**
@@ -104,6 +104,9 @@ export function parseRuntimeKey(key: string): {
   applicationId: string;
   platform: string;
 } {
-  const [platform, applicationId] = key.split(':');
-  return { applicationId, platform };
+  const idx = key.indexOf(':');
+  return {
+    applicationId: idx === -1 ? key : key.slice(idx + 1),
+    platform: idx === -1 ? '' : key.slice(0, idx),
+  };
 }
