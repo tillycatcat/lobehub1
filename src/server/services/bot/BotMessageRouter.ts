@@ -16,8 +16,8 @@ import {
   buildRuntimeKey,
   type PlatformClient,
   type PlatformDefinition,
+  platformRegistry,
 } from './platforms';
-import { getDefinition } from './platforms';
 
 const log = debug('lobe-server:bot:message-router');
 
@@ -59,7 +59,7 @@ export class BotMessageRouter {
    */
   getWebhookHandler(platform: string, appId?: string): (req: Request) => Promise<Response> {
     return async (req: Request) => {
-      const entry = getDefinition(platform);
+      const entry = platformRegistry.getPlatform(platform);
       if (!entry) {
         return new Response('No bot configured for this platform', { status: 404 });
       }
@@ -124,7 +124,7 @@ export class BotMessageRouter {
     const key = buildRuntimeKey(platform, appId);
 
     try {
-      const entry = getDefinition(platform);
+      const entry = platformRegistry.getPlatform(platform);
       if (!entry) {
         log('No definition for platform: %s', platform);
         return null;

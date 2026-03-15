@@ -71,15 +71,17 @@ vi.mock('@/server/services/systemAgent', () => ({
 }));
 
 vi.mock('../platforms', () => ({
-  getDefinition: vi.fn().mockImplementation((platform: string) => {
-    if (platform === 'unknown') return undefined;
-    return {
-      adapterFactory: { createClient: mockCreateBot },
-      credentials: [],
-      name: platform,
-      id: platform,
-    };
-  }),
+  platformRegistry: {
+    getPlatform: vi.fn().mockImplementation((platform: string) => {
+      if (platform === 'unknown') return undefined;
+      return {
+        adapterFactory: { createClient: mockCreateBot },
+        credentials: [],
+        name: platform,
+        id: platform,
+      };
+    }),
+  },
 }));
 
 // ==================== Helpers ====================

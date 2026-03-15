@@ -2,17 +2,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { formatPrompt, formatReferencedMessage } from '../formatPrompt';
 
-// Mock the platforms module so that getDefinition('discord') returns an entry with sanitizeUserInput
 vi.mock('../platforms', () => ({
-  getDefinition: vi.fn().mockImplementation((platform: string) => {
-    if (platform === 'discord') {
-      return {
-        sanitizeUserInput: (text: string, applicationId: string) =>
-          text.replaceAll(new RegExp(`<@!?${applicationId}>\\s*`, 'g'), '').trim(),
-      };
-    }
-    return undefined;
-  }),
+  platformRegistry: {
+    getPlatform: vi.fn().mockImplementation((platform: string) => {
+      if (platform === 'discord') {
+        return {
+          sanitizeUserInput: (text: string, applicationId: string) =>
+            text.replaceAll(new RegExp(`<@!?${applicationId}>\\s*`, 'g'), '').trim(),
+        };
+      }
+      return undefined;
+    }),
+  },
 }));
 
 describe('formatReferencedMessage', () => {

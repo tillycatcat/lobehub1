@@ -1,6 +1,6 @@
 import { formatSpeakerMessage } from '@lobechat/prompts';
 
-import { getDefinition } from './platforms';
+import { platformRegistry } from './platforms';
 
 interface RawReferencedMessage {
   author?: { global_name?: string; username?: string };
@@ -46,7 +46,7 @@ export const formatPrompt = (message: MessageLike, botContext?: BotContext): str
   let text = message.text;
 
   if (botContext?.platform && botContext.applicationId) {
-    const entry = getDefinition(botContext.platform);
+    const entry = platformRegistry.getPlatform(botContext.platform);
     if (entry?.sanitizeUserInput) {
       text = entry.sanitizeUserInput(text, botContext.applicationId);
     }

@@ -18,7 +18,6 @@ describe('PlatformRegistry', () => {
       registry.register(def);
 
       expect(registry.getPlatform('test')).toBe(def);
-      expect(registry.has('test')).toBe(true);
     });
 
     it('should throw on duplicate registration', () => {
@@ -31,7 +30,6 @@ describe('PlatformRegistry', () => {
     it('should return undefined for unknown platform', () => {
       const registry = new PlatformRegistry();
       expect(registry.getPlatform('unknown')).toBeUndefined();
-      expect(registry.has('unknown')).toBe(false);
     });
   });
 

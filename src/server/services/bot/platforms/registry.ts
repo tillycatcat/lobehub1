@@ -34,11 +34,6 @@ export class PlatformRegistry {
     return [...this.platforms.values()];
   }
 
-  /** Check whether a platform is registered. */
-  has(platform: string): boolean {
-    return this.platforms.has(platform);
-  }
-
   /**
    * Create a PlatformClient for a given platform.
    *

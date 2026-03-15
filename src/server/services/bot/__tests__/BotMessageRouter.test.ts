@@ -62,9 +62,8 @@ const mockCreateAdapter = vi.hoisted(() =>
   vi.fn().mockReturnValue({ testplatform: { type: 'mock-adapter' } }),
 );
 
-vi.mock('../platforms', () => ({
-  buildRuntimeKey: (platform: string, appId: string) => `${platform}:${appId}`,
-  getDefinition: vi.fn().mockImplementation((platform: string) => {
+const mockGetPlatform = vi.hoisted(() =>
+  vi.fn().mockImplementation((platform: string) => {
     if (platform === 'unknown') return undefined;
     return {
       adapterFactory: {
@@ -89,6 +88,13 @@ vi.mock('../platforms', () => ({
       name: platform,
     };
   }),
+);
+
+vi.mock('../platforms', () => ({
+  buildRuntimeKey: (platform: string, appId: string) => `${platform}:${appId}`,
+  platformRegistry: {
+    getPlatform: mockGetPlatform,
+  },
 }));
 
 // ==================== Helpers ====================

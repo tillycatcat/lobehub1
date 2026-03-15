@@ -7,7 +7,7 @@ import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 import { SystemAgentService } from '@/server/services/systemAgent';
 
 import type { BotProviderConfig, PlatformClient, PlatformMessenger, UsageStats } from './platforms';
-import { getDefinition } from './platforms';
+import { platformRegistry } from './platforms';
 import { renderError, renderFinalReply, renderStepProgress, splitMessage } from './replyTemplate';
 
 const log = debug('lobe-server:bot:callback');
@@ -100,7 +100,7 @@ export class BotCallbackService {
       credentials = JSON.parse(row.credentials);
     }
 
-    const entry = getDefinition(platform);
+    const entry = platformRegistry.getPlatform(platform);
     if (!entry) {
       throw new Error(`Unsupported platform: ${platform}`);
     }

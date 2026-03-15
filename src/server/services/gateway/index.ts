@@ -4,7 +4,7 @@ import { getServerDB } from '@/database/core/db-adaptor';
 import { AgentBotProviderModel } from '@/database/models/agentBotProvider';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 
-import { getAllDefinitions } from '../bot/platforms';
+import { platformRegistry } from '../bot/platforms';
 import { BotConnectQueue } from './botConnectQueue';
 import { createGatewayManager, getGatewayManager } from './GatewayManager';
 
@@ -20,7 +20,7 @@ export class GatewayService {
       return;
     }
 
-    const manager = createGatewayManager({ definitions: getAllDefinitions() });
+    const manager = createGatewayManager({ definitions: platformRegistry.listPlatforms() });
     await manager.start();
 
     log('GatewayManager started');
@@ -54,7 +54,7 @@ export class GatewayService {
 
       // Webhook-based platforms only need a single HTTP call,
       // so we can run directly in a Vercel serverless function.
-      const manager = createGatewayManager({ definitions: getAllDefinitions() });
+      const manager = createGatewayManager({ definitions: platformRegistry.listPlatforms() });
       await manager.startBot(platform, applicationId, userId);
       log('Started bot %s:%s (direct)', platform, applicationId);
       return 'started';

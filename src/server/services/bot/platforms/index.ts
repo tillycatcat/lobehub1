@@ -42,7 +42,3 @@ platformRegistry.register(discord);
 platformRegistry.register(telegram);
 platformRegistry.register(feishu);
 platformRegistry.register(qq);
-
-// Convenience accessors
-export const getDefinition = platformRegistry.getPlatform.bind(platformRegistry);
-export const getAllDefinitions = platformRegistry.listPlatforms.bind(platformRegistry);
