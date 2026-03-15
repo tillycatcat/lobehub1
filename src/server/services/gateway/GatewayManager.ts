@@ -1,24 +1,26 @@
+import type { BotProviderConfig, PlatformClient, PlatformDefinition } from '@lobechat/bot-platform';
 import debug from 'debug';
 
 import { getServerDB } from '@/database/core/db-adaptor';
 import { AgentBotProviderModel } from '@/database/models/agentBotProvider';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 
-import type { PlatformBot, PlatformBotClass } from '../bot/types';
-
 const log = debug('lobe-server:bot-gateway');
 
 export interface GatewayManagerConfig {
-  registry: Record<string, PlatformBotClass>;
+  definitions: PlatformDefinition[];
 }
 
 export class GatewayManager {
-  private bots = new Map<string, PlatformBot>();
+  private bots = new Map<string, PlatformClient>();
   private running = false;
   private config: GatewayManagerConfig;
 
+  private definitionByPlatform: Map<string, PlatformDefinition>;
+
   constructor(config: GatewayManagerConfig) {
     this.config = config;
+    this.definitionByPlatform = new Map(config.definitions.map((e) => [e.platform, e]));
   }
 
   get isRunning(): boolean {
@@ -86,7 +88,7 @@ export class GatewayManager {
       return;
     }
 
-    const bot = this.createBot(platform, provider);
+    const bot = this.createConnector(platform, provider);
     if (!bot) {
       log('Unsupported platform: %s', platform);
       return;
@@ -112,7 +114,7 @@ export class GatewayManager {
   // ------------------------------------------------------------------
 
   private async sync(): Promise<void> {
-    for (const platform of Object.keys(this.config.registry)) {
+    for (const platform of this.definitionByPlatform.keys()) {
       try {
         await this.syncPlatform(platform);
       } catch (error) {
@@ -147,9 +149,9 @@ export class GatewayManager {
         continue;
       }
 
-      const bot = this.createBot(platform, provider);
+      const bot = this.createConnector(platform, provider);
       if (!bot) {
-        log('Sync: createBot returned null for %s', key);
+        log('Sync: createConnector returned null for %s', key);
         continue;
       }
 
@@ -177,21 +179,34 @@ export class GatewayManager {
   // Factory
   // ------------------------------------------------------------------
 
-  private createBot(
+  private createConnector(
     platform: string,
     provider: { applicationId: string; credentials: Record<string, string> },
-  ): PlatformBot | null {
-    const BotClass = this.config.registry[platform];
-    if (!BotClass) {
-      log('No bot class registered for platform: %s', platform);
+  ): PlatformClient | null {
+    const def = this.definitionByPlatform.get(platform);
+    if (!def) {
+      log('No definition registered for platform: %s', platform);
       return null;
     }
 
-    return new BotClass({
-      ...provider.credentials,
+    const config: BotProviderConfig = {
       applicationId: provider.applicationId,
+      connectionMode: def.connectionMode,
+      credentials: provider.credentials,
       platform,
-    });
+      settings: {},
+    };
+
+    return def.createClient(config, {});
+  }
+
+  /**
+   * Check whether a platform uses a persistent connection (e.g. WebSocket).
+   * Persistent bots cannot run in serverless environments.
+   */
+  isPersistent(platform: string): boolean {
+    const def = this.definitionByPlatform.get(platform);
+    return def?.connectionMode === 'websocket';
   }
 }
 

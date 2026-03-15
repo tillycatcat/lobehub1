@@ -1,25 +1,33 @@
-import type { PlatformBotClass, PlatformDescriptor } from '../types';
-import { Discord, discordDescriptor } from './discord';
-import { feishuDescriptor, Lark, larkDescriptor } from './lark';
-import { QQ, qqDescriptor } from './qq';
-import { Telegram, telegramDescriptor } from './telegram';
+import {
+  discordWebsocket,
+  feishuWebhook,
+  larkWebhook,
+  type PlatformDefinition,
+  qqWebhook,
+  telegramWebhook,
+} from '@lobechat/bot-platform';
 
-export const platformBotRegistry: Record<string, PlatformBotClass> = {
-  discord: Discord,
-  feishu: Lark,
-  lark: Lark,
-  qq: QQ,
-  telegram: Telegram,
-};
+const allDefinitions: PlatformDefinition[] = [
+  discordWebsocket,
+  telegramWebhook,
+  larkWebhook,
+  feishuWebhook,
+  qqWebhook,
+];
 
-export const platformDescriptors: Record<string, PlatformDescriptor> = {
-  discord: discordDescriptor,
-  feishu: feishuDescriptor,
-  lark: larkDescriptor,
-  qq: qqDescriptor,
-  telegram: telegramDescriptor,
-};
+/** Look up platform definition by platform name. */
+const definitionByPlatform = new Map<string, PlatformDefinition>(
+  allDefinitions.map((d) => [d.platform, d]),
+);
 
-export function getPlatformDescriptor(platform: string): PlatformDescriptor | undefined {
-  return platformDescriptors[platform];
+export function getDefinition(platform: string): PlatformDefinition | undefined {
+  return definitionByPlatform.get(platform);
+}
+
+export function getAllDefinitions(): PlatformDefinition[] {
+  return allDefinitions;
+}
+
+export function getAllPlatforms(): string[] {
+  return allDefinitions.map((d) => d.platform);
 }

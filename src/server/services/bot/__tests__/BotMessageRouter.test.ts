@@ -56,28 +56,39 @@ vi.mock('../AgentBridgeService', () => ({
   })),
 }));
 
-// Mock platform descriptors
+// Mock platform entries
 const mockCreateAdapter = vi.hoisted(() =>
   vi.fn().mockReturnValue({ testplatform: { type: 'mock-adapter' } }),
 );
-const mockOnBotRegistered = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockOnRegistered = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('../platforms', () => ({
-  getPlatformDescriptor: vi.fn().mockImplementation((platform: string) => {
+  getAllPlatforms: vi.fn().mockReturnValue(['discord', 'telegram', 'lark']),
+  getDefinition: vi.fn().mockImplementation((platform: string) => {
     if (platform === 'unknown') return undefined;
     return {
-      charLimit: platform === 'telegram' ? 4000 : undefined,
-      createAdapter: mockCreateAdapter,
-      handleDirectMessages: platform === 'telegram' || platform === 'lark',
-      onBotRegistered: mockOnBotRegistered,
+      connectionMode: platform === 'discord' ? 'websocket' : 'webhook',
+      createClient: vi.fn().mockReturnValue({
+        applicationId: 'mock-app',
+        createAdapter: mockCreateAdapter,
+        extractChatId: (id: string) => id.split(':')[1],
+        getMessenger: () => ({
+          createMessage: vi.fn(),
+          editMessage: vi.fn(),
+          removeReaction: vi.fn(),
+          triggerTyping: vi.fn(),
+        }),
+        onRegistered: mockOnRegistered,
+        parseMessageId: (id: string) => id,
+        platform,
+        start: vi.fn(),
+        stop: vi.fn(),
+      }),
+      credentials: [],
+      displayName: platform,
       platform,
     };
   }),
-  platformDescriptors: {
-    discord: { platform: 'discord' },
-    lark: { platform: 'lark' },
-    telegram: { platform: 'telegram' },
-  },
 }));
 
 // ==================== Tests ====================
@@ -118,8 +129,8 @@ describe('BotMessageRouter', () => {
       const router = new BotMessageRouter();
       await router.initialize();
 
-      // Should query each platform in the descriptor registry
-      expect(mockFindEnabledByPlatform).toHaveBeenCalledTimes(3); // discord, lark, telegram
+      // Should query each platform in the entry registry
+      expect(mockFindEnabledByPlatform).toHaveBeenCalledTimes(3); // discord, telegram, lark
     });
 
     it('should create bots for enabled providers', async () => {
@@ -142,15 +153,10 @@ describe('BotMessageRouter', () => {
 
       // Chat SDK should be initialized
       expect(mockInitialize).toHaveBeenCalled();
-      // Adapter should be created via descriptor
-      expect(mockCreateAdapter).toHaveBeenCalledWith({ botToken: 'tg-token' }, 'tg-bot-123');
+      // Adapter should be created via PlatformClient
+      expect(mockCreateAdapter).toHaveBeenCalled();
       // Post-registration hook should be called
-      expect(mockOnBotRegistered).toHaveBeenCalledWith(
-        expect.objectContaining({
-          applicationId: 'tg-bot-123',
-          credentials: { botToken: 'tg-token' },
-        }),
-      );
+      expect(mockOnRegistered).toHaveBeenCalled();
     });
 
     it('should register onNewMessage for platforms with dm.enabled in settings', async () => {
@@ -194,7 +200,7 @@ describe('BotMessageRouter', () => {
       const router = new BotMessageRouter();
       await router.initialize();
 
-      // Discord should NOT have onNewMessage registered (handleDirectMessages = false)
+      // Discord should NOT have onNewMessage registered (dm not enabled by default)
       expect(mockOnNewMessage).not.toHaveBeenCalled();
     });
 

@@ -1,10 +1,10 @@
-import type { BotPlatformEntry, PlatformSettingsSchema } from '../../types';
-import { qqBotFactory } from './bot';
+import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
+import { telegramClientFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
     charLimit: {
-      default: 2000,
+      default: 4000,
       minimum: 100,
       title: 'Character Limit',
       type: 'number',
@@ -34,18 +34,31 @@ const settingsSchema: PlatformSettingsSchema = {
   type: 'object',
 };
 
-export const qqWebhookEntry: BotPlatformEntry = {
-  platform: 'qq',
+export const telegramWebhook: PlatformDefinition = {
+  platform: 'telegram',
   connectionMode: 'webhook',
-  description: 'Connect a QQ bot via webhook',
-  displayName: 'QQ',
-  portalUrl: 'https://q.qq.com/',
+  description: 'Connect a Telegram bot via webhook',
+  displayName: 'Telegram',
+  portalUrl: 'https://t.me/BotFather',
 
   credentials: [
-    { key: 'appId', label: 'App ID', required: true, type: 'string' },
-    { key: 'appSecret', label: 'App Secret', required: true, type: 'secret' },
+    { key: 'botToken', label: 'Bot Token', required: true, type: 'secret' },
+    {
+      key: 'secretToken',
+      label: 'Webhook Secret Token',
+      description: 'Optional secret token for webhook verification',
+      required: false,
+      type: 'secret',
+    },
+    {
+      key: 'webhookProxyUrl',
+      label: 'Webhook Proxy URL',
+      description: 'HTTPS proxy URL for local development (e.g. Cloudflare tunnel)',
+      required: false,
+      type: 'string',
+    },
   ],
   settings: settingsSchema,
 
-  createBot: qqBotFactory,
+  createClient: telegramClientFactory,
 };

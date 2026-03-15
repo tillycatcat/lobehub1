@@ -1,5 +1,5 @@
-import type { BotPlatformEntry, PlatformSettingsSchema } from '../../types';
-import { larkBotFactory } from './bot';
+import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
+import { larkClientFactory } from './client';
 
 const sharedSettingsSchema: PlatformSettingsSchema = {
   properties: {
@@ -53,12 +53,12 @@ const sharedCredentials = [
   },
 ];
 
-function createLarkEntry(
+function createLarkDefinition(
   platform: 'lark' | 'feishu',
   displayName: string,
   description: string,
   portalUrl: string,
-): BotPlatformEntry {
+): PlatformDefinition {
   return {
     platform,
     connectionMode: 'webhook',
@@ -69,17 +69,17 @@ function createLarkEntry(
     credentials: sharedCredentials,
     settings: sharedSettingsSchema,
 
-    createBot: larkBotFactory,
+    createClient: larkClientFactory,
   };
 }
 
-export const larkWebhookEntry = createLarkEntry(
+export const larkWebhook = createLarkDefinition(
   'lark',
   'Lark',
   'Connect a Lark bot via webhook',
   'https://open.larksuite.com/app',
 );
-export const feishuWebhookEntry = createLarkEntry(
+export const feishuWebhook = createLarkDefinition(
   'feishu',
   '飞书',
   '通过 Webhook 连接飞书机器人',

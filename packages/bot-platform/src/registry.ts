@@ -1,4 +1,4 @@
-import type { BotPlatformEntry } from './types';
+import type { PlatformDefinition } from './types';
 
 /**
  * Build a registry key for a platform entry.
@@ -12,7 +12,7 @@ export function entryKey(platform: string, connectionMode: string): string {
  * Build a runtime key for a registered bot instance.
  * Format: `platform:connectionMode:applicationId`
  */
-export function buildRuntimeKey(entry: BotPlatformEntry, applicationId: string): string {
+export function buildRuntimeKey(entry: PlatformDefinition, applicationId: string): string {
   return `${entry.platform}:${entry.connectionMode}:${applicationId}`;
 }
 

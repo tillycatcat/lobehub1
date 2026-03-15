@@ -1,11 +1,11 @@
-import { createLarkAdapter, LarkApiClient } from '@lobechat/adapter-lark';
+import { createLarkAdapter, LarkApiClient } from '@lobechat/chat-adapter-lark';
 import debug from 'debug';
 
 import type {
   BotPlatformRuntimeContext,
   BotProviderConfig,
-  PlatformBot,
-  PlatformBotFactory,
+  PlatformClient,
+  PlatformClientFactory,
   PlatformMessenger,
 } from '../../types';
 
@@ -15,7 +15,7 @@ function extractChatId(platformThreadId: string): string {
   return platformThreadId.split(':')[1];
 }
 
-class LarkWebhookBot implements PlatformBot {
+class LarkWebhookClient implements PlatformClient {
   readonly platform: string;
   readonly applicationId: string;
 
@@ -86,9 +86,9 @@ class LarkWebhookBot implements PlatformBot {
   }
 }
 
-export const larkBotFactory: PlatformBotFactory = (
+export const larkClientFactory: PlatformClientFactory = (
   account: BotProviderConfig,
   context: BotPlatformRuntimeContext,
-): PlatformBot => {
-  return new LarkWebhookBot(account, context);
+): PlatformClient => {
+  return new LarkWebhookClient(account, context);
 };

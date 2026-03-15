@@ -1,4 +1,4 @@
-import { TELEGRAM_API_BASE } from './client';
+import { TELEGRAM_API_BASE } from './api';
 
 /**
  * Extract the bot user ID from a Telegram bot token.

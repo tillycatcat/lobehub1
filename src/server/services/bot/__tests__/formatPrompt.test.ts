@@ -1,6 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { formatPrompt, formatReferencedMessage } from '../formatPrompt';
+
+// Mock the platforms module so that getDefinition('discord') returns an entry with sanitizeUserInput
+vi.mock('../platforms', () => ({
+  getDefinition: vi.fn().mockImplementation((platform: string) => {
+    if (platform === 'discord') {
+      return {
+        sanitizeUserInput: (text: string, applicationId: string) =>
+          text.replaceAll(new RegExp(`<@!?${applicationId}>\\s*`, 'g'), '').trim(),
+      };
+    }
+    return undefined;
+  }),
+}));
 
 describe('formatReferencedMessage', () => {
   it('should return undefined when raw is undefined', () => {
@@ -88,7 +101,7 @@ describe('formatPrompt', () => {
 
   it('should strip bot @mention from text', () => {
     const msg = { ...baseMessage, text: '<@bot123> hello world' };
-    const result = formatPrompt(msg, { applicationId: 'bot123' });
+    const result = formatPrompt(msg, { applicationId: 'bot123', platform: 'discord' });
 
     expect(result).toContain('hello world');
     expect(result).not.toContain('<@bot123>');
@@ -96,10 +109,17 @@ describe('formatPrompt', () => {
 
   it('should strip bot @mention with ! format', () => {
     const msg = { ...baseMessage, text: '<@!bot123> hello world' };
-    const result = formatPrompt(msg, { applicationId: 'bot123' });
+    const result = formatPrompt(msg, { applicationId: 'bot123', platform: 'discord' });
 
     expect(result).toContain('hello world');
     expect(result).not.toContain('<@!bot123>');
+  });
+
+  it('should not strip mentions for platforms without sanitizeUserInput', () => {
+    const msg = { ...baseMessage, text: '<@bot123> hello world' };
+    const result = formatPrompt(msg, { applicationId: 'bot123', platform: 'telegram' });
+
+    expect(result).toContain('<@bot123>');
   });
 
   it('should prepend referenced message before user text', () => {
@@ -156,7 +176,7 @@ describe('formatPrompt', () => {
       },
       text: '<@bot999> yes we can',
     };
-    const result = formatPrompt(msg, { applicationId: 'bot999' });
+    const result = formatPrompt(msg, { applicationId: 'bot999', platform: 'discord' });
 
     expect(result).not.toContain('<@bot999>');
     expect(result).toContain('yes we can');

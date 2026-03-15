@@ -1,4 +1,9 @@
 import { createIoRedisState } from '@chat-adapter/state-ioredis';
+import type {
+  BotPlatformRuntimeContext,
+  BotProviderConfig,
+  PlatformClient,
+} from '@lobechat/bot-platform';
 import { Chat, ConsoleLogger } from 'chat';
 import debug from 'debug';
 
@@ -9,17 +14,13 @@ import { getAgentRuntimeRedisClient } from '@/server/modules/AgentRuntime/redis'
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 
 import { AgentBridgeService } from './AgentBridgeService';
-import { getPlatformDescriptor, platformDescriptors } from './platforms';
+import { getAllPlatforms, getDefinition } from './platforms';
 
 const log = debug('lobe-server:bot:message-router');
 
 interface ResolvedAgentInfo {
   agentId: string;
   userId: string;
-}
-
-interface StoredCredentials {
-  [key: string]: string;
 }
 
 /**
@@ -36,8 +37,8 @@ export class BotMessageRouter {
   /** "platform:applicationId" → Chat instance */
   private botInstances = new Map<string, Chat<any>>();
 
-  /** "platform:applicationId" → credentials */
-  private credentialsByKey = new Map<string, StoredCredentials>();
+  /** "platform:applicationId" → PlatformClient instance */
+  private connectors = new Map<string, PlatformClient>();
 
   // ------------------------------------------------------------------
   // Public API
@@ -53,8 +54,8 @@ export class BotMessageRouter {
     return async (req: Request) => {
       await this.ensureInitialized();
 
-      const descriptor = getPlatformDescriptor(platform);
-      if (!descriptor) {
+      const entry = getDefinition(platform);
+      if (!entry) {
         return new Response('No bot configured for this platform', { status: 404 });
       }
 
@@ -233,8 +234,9 @@ export class BotMessageRouter {
       const serverDB = await getServerDB();
       const gateKeeper = await KeyVaultsGateKeeper.initWithEnvKey();
 
-      // Load all supported platforms from the descriptor registry
-      for (const platform of Object.keys(platformDescriptors)) {
+      for (const platform of getAllPlatforms()) {
+        const entry = getDefinition(platform)!;
+
         const providers = await AgentBotProviderModel.findEnabledByPlatform(
           serverDB,
           platform,
@@ -252,33 +254,42 @@ export class BotMessageRouter {
             continue;
           }
 
-          const descriptor = getPlatformDescriptor(platform);
-          if (!descriptor) {
-            log('Unsupported platform: %s', platform);
-            continue;
-          }
+          // Create PlatformClient instance
+          const providerConfig: BotProviderConfig = {
+            applicationId,
+            connectionMode: entry.connectionMode,
+            credentials,
+            platform,
+            settings: (provider.settings as Record<string, unknown>) || {},
+          };
 
-          const adapters = descriptor.createAdapter(credentials, applicationId);
+          const runtimeContext: BotPlatformRuntimeContext = {
+            appUrl: process.env.APP_URL,
+            redisClient: getAgentRuntimeRedisClient() as any,
+          };
 
-          const bot = this.createBot(adapters, `agent-${agentId}`);
-          this.registerHandlers(bot, serverDB, {
+          const connector = entry.createClient(providerConfig, runtimeContext);
+
+          // Create Chat SDK adapters from the bot instance
+          const adapters = connector.createAdapter();
+
+          const chatBot = this.createChatBot(adapters, `agent-${agentId}`);
+          this.registerHandlers(chatBot, serverDB, connector, {
             agentId,
             applicationId,
             platform,
             settings: provider.settings as Record<string, any> | undefined,
             userId,
           });
-          await bot.initialize();
+          await chatBot.initialize();
 
-          this.botInstances.set(key, bot);
+          this.botInstances.set(key, chatBot);
+          this.connectors.set(key, connector);
           this.agentMap.set(key, { agentId, userId });
-          this.credentialsByKey.set(key, credentials);
 
           // Platform-specific post-registration hook
-          await descriptor.onBotRegistered?.({
-            applicationId,
-            credentials,
-            registerByToken: (token: string) => this.botInstancesByToken.set(token, bot),
+          await connector.onRegistered?.({
+            registerByToken: (token: string) => this.botInstancesByToken.set(token, chatBot),
           });
 
           log('Created %s bot for agent=%s, appId=%s', platform, agentId, applicationId);
@@ -332,7 +343,7 @@ export class BotMessageRouter {
     return this.sharedRedisProxy;
   }
 
-  private createBot(adapters: Record<string, any>, label: string): Chat<any> {
+  private createChatBot(adapters: Record<string, any>, label: string): Chat<any> {
     const config: any = {
       adapters,
       userName: `lobehub-bot-${label}`,
@@ -353,6 +364,7 @@ export class BotMessageRouter {
   private registerHandlers(
     bot: Chat<any>,
     serverDB: LobeChatDatabase,
+    connector: PlatformClient,
     info: ResolvedAgentInfo & {
       applicationId: string;
       platform: string;
@@ -373,6 +385,7 @@ export class BotMessageRouter {
       await bridge.handleMention(thread, message, {
         agentId,
         botContext: { applicationId, platform, platformThreadId: thread.id },
+        connector,
       });
     });
 
@@ -390,6 +403,7 @@ export class BotMessageRouter {
       await bridge.handleSubscribedMessage(thread, message, {
         agentId,
         botContext: { applicationId, platform, platformThreadId: thread.id },
+        connector,
       });
     });
 
@@ -411,6 +425,7 @@ export class BotMessageRouter {
         await bridge.handleMention(thread, message, {
           agentId,
           botContext: { applicationId, platform, platformThreadId: thread.id },
+          connector,
         });
       });
     }

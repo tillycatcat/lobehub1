@@ -1,6 +1,6 @@
 import debug from 'debug';
 
-import { platformBotRegistry } from '../bot/platforms';
+import { getAllDefinitions, getDefinition } from '../bot/platforms';
 import { BotConnectQueue } from './botConnectQueue';
 import { createGatewayManager, getGatewayManager } from './GatewayManager';
 
@@ -16,7 +16,7 @@ export class GatewayService {
       return;
     }
 
-    const manager = createGatewayManager({ registry: platformBotRegistry });
+    const manager = createGatewayManager({ definitions: getAllDefinitions() });
     await manager.start();
 
     log('GatewayManager started');
@@ -36,8 +36,8 @@ export class GatewayService {
     userId: string,
   ): Promise<'started' | 'queued'> {
     if (isVercel) {
-      const BotClass = platformBotRegistry[platform];
-      const isPersistent = BotClass?.persistent === true;
+      const def = getDefinition(platform);
+      const isPersistent = def?.connectionMode === 'websocket';
 
       if (isPersistent) {
         // Persistent platforms (e.g. Discord WebSocket) cannot run in a
@@ -50,7 +50,7 @@ export class GatewayService {
 
       // Webhook-based platforms (Telegram, Lark, etc.) only need a single HTTP
       // call, so we can run directly in a Vercel serverless function.
-      const manager = createGatewayManager({ registry: platformBotRegistry });
+      const manager = createGatewayManager({ definitions: getAllDefinitions() });
       await manager.startBot(platform, applicationId, userId);
       log('Started bot %s:%s (direct)', platform, applicationId);
       return 'started';

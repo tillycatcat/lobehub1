@@ -18,7 +18,7 @@ export interface CredentialField {
 /**
  * Lightweight JSON Schema subset for describing platform settings.
  *
- * Each platform entry declares a `settingsSchema`.
+ * Each platform definition declares a `settingsSchema`.
  * The schema drives:
  * - Frontend: auto-generated settings form
  * - Runtime: default value resolution (user overrides ← schema defaults)
@@ -55,29 +55,53 @@ export interface PlatformMessenger {
   updateThreadName?: (name: string) => Promise<void>;
 }
 
-// --------------- Platform Bot ---------------
+// --------------- Usage Stats ---------------
 
 /**
- * A stateful bot instance holding credentials and runtime context.
+ * Raw usage statistics for a bot response.
+ * Passed to `PlatformClient.formatReply` so each platform can decide
+ * whether and how to render usage information.
+ */
+export interface UsageStats {
+  elapsedMs?: number;
+  llmCalls?: number;
+  toolCalls?: number;
+  totalCost: number;
+  totalTokens: number;
+}
+
+// --------------- Platform Client ---------------
+
+/**
+ * A client to a specific platform instance, holding credentials and runtime context.
  *
- * Server services interact with the bot through this interface only.
+ * Server services interact with the platform through this interface only.
  * All platform-specific operations are encapsulated here.
  */
-export interface PlatformBot {
+export interface PlatformClient {
   readonly applicationId: string;
   /** Create a Chat SDK adapter config for inbound message handling. */
   createAdapter: () => Record<string, any>;
 
   /** Extract the chat/channel ID from a composite platformThreadId. */
   extractChatId: (platformThreadId: string) => string;
+
+  /**
+   * Format the final outbound reply from body content and optional usage stats.
+   * Each platform decides whether to render the stats and how to format them
+   * (e.g. Discord uses `-# stats` when the user enables usage display).
+   * When not implemented, the caller returns body as-is (no stats).
+   */
+  formatReply?: (body: string, stats?: UsageStats) => string;
+
   /** Get a messenger for a specific thread (outbound messaging). */
   getMessenger: (platformThreadId: string) => PlatformMessenger;
 
   // --- Runtime Operations ---
 
   /**
-   * Called after the bot is registered in BotMessageRouter.
-   * Discord: indexes bot by token for gateway forwarding.
+   * Called after the client is registered in BotMessageRouter.
+   * Discord: indexes client by token for gateway forwarding.
    */
   onRegistered?: (context: { registerByToken?: (token: string) => void }) => Promise<void>;
 
@@ -86,8 +110,17 @@ export interface PlatformBot {
 
   readonly platform: string;
 
+  /** Strip platform-specific bot mention artifacts from user input. */
+  sanitizeUserInput?: (text: string) => string;
+
+  /**
+   * Whether the bot should subscribe to a thread. Default: true.
+   * Discord: returns false for top-level channels (not threads).
+   */
+  shouldSubscribe?: (threadId: string) => boolean;
+
   // --- Lifecycle ---
-  start: () => Promise<void>;
+  start: (options?: any) => Promise<void>;
 
   stop: () => Promise<void>;
 }
@@ -121,36 +154,40 @@ export interface BotPlatformRuntimeContext {
   registerByToken?: (token: string) => void;
 }
 
-// --------------- Bot Factory ---------------
+// --------------- Client Factory ---------------
 
-export type PlatformBotFactory = (
+export type PlatformClientFactory = (
   account: BotProviderConfig,
   context: BotPlatformRuntimeContext,
-) => PlatformBot;
+) => PlatformClient;
 
-// --------------- Platform Entry ---------------
+// --------------- Platform Definition ---------------
 
 /**
- * A platform registration entry, uniquely identified by `platform + connectionMode`.
+ * A platform definition, uniquely identified by `platform + connectionMode`.
  *
- * Entry is metadata + factory. All runtime operations go through PlatformBot.
+ * Contains metadata + factory. All runtime operations go through PlatformClient.
  */
-export interface BotPlatformEntry {
+export interface PlatformDefinition {
   // --- Identity ---
   connectionMode: 'webhook' | 'websocket';
   // --- Factory ---
-  createBot: PlatformBotFactory;
+  createClient: PlatformClientFactory;
   // --- Schemas (for frontend UI) ---
   credentials: CredentialField[];
 
   description?: string;
   displayName: string;
+
   platform: string;
+
   /** URL to the platform's developer portal / open platform console */
   portalUrl?: string;
-
   // --- Webhook routing (optional) ---
   resolveWebhook?: PlatformWebhookResolver;
+
+  /** Strip platform-specific bot mention artifacts from user input text. */
+  sanitizeUserInput?: (text: string, applicationId: string) => string;
 
   settings?: PlatformSettingsSchema;
 }
@@ -159,7 +196,7 @@ export interface BotPlatformEntry {
 
 export interface RegisteredBotProviderConfig {
   config: BotProviderConfig;
-  entry: BotPlatformEntry;
+  entry: PlatformDefinition;
   runtimeKey: string;
 }
 

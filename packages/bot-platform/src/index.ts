@@ -1,23 +1,27 @@
 // --------------- Core types ---------------
 export { buildRuntimeKey, entryKey, parseRuntimeKey } from './registry';
 export type {
-  BotPlatformEntry,
   BotPlatformRedisClient,
   BotPlatformRuntimeContext,
   BotProviderConfig,
   CredentialField,
-  PlatformBot,
-  PlatformBotFactory,
+  PlatformClient,
+  PlatformClientFactory,
+  PlatformDefinition,
   PlatformMessenger,
   PlatformSettingsSchema,
   PlatformSettingsSchemaProperty,
   PlatformWebhookResolver,
   PlatformWebhookResolverContext,
   RegisteredBotProviderConfig,
+  UsageStats,
 } from './types';
 
-// --------------- Platform entries ---------------
-export { discordWebsocketEntry } from './platforms/discord/entries';
-export { feishuWebhookEntry, larkWebhookEntry } from './platforms/lark/entries';
-export { qqWebhookEntry } from './platforms/qq/entries';
-export { telegramWebhookEntry } from './platforms/telegram/entries';
+// --------------- Utils ---------------
+export { formatDuration, formatTokens, formatUsageStats } from './utils';
+
+// --------------- Platform definitions ---------------
+export { discordWebsocket } from './platforms/discord/definition';
+export { feishuWebhook, larkWebhook } from './platforms/lark/definition';
+export { qqWebhook } from './platforms/qq/definition';
+export { telegramWebhook } from './platforms/telegram/definition';

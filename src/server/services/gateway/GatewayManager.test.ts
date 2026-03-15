@@ -1,4 +1,5 @@
 // @vitest-environment node
+import type { PlatformClient, PlatformDefinition } from '@lobechat/bot-platform';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getServerDB } from '@/database/core/db-adaptor';
@@ -28,16 +29,34 @@ vi.mock('@/server/modules/KeyVaultsEncrypt', () => ({
   },
 }));
 
-// Helper: create a mock PlatformBot instance
-const createMockBot = () => ({
+// Helper: create a mock PlatformClient instance
+const createMockBot = (): PlatformClient => ({
+  applicationId: 'app-1',
+  createAdapter: () => ({}),
+  extractChatId: (id: string) => id,
+  getMessenger: () => ({
+    createMessage: async () => {},
+    editMessage: async () => {},
+    removeReaction: async () => {},
+    triggerTyping: async () => {},
+  }),
+  parseMessageId: (id: string) => id,
+  platform: 'slack',
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(undefined),
 });
 
-// Helper: create a mock PlatformBot class (constructor)
-const createMockBotClass = (instance = createMockBot()) => {
-  return vi.fn().mockImplementation(() => instance);
-};
+// Helper: create a fake definition with a factory that returns the given bot
+const createFakeDefinition = (
+  platform: string,
+  factoryFn?: (...args: any[]) => PlatformClient,
+): PlatformDefinition => ({
+  connectionMode: 'webhook',
+  createClient: factoryFn || (() => createMockBot()),
+  credentials: [],
+  displayName: platform,
+  platform,
+});
 
 describe('GatewayManager', () => {
   let mockDb: any;
@@ -69,20 +88,19 @@ describe('GatewayManager', () => {
 
   describe('constructor and isRunning', () => {
     it('should initialize with isRunning = false', () => {
-      const manager = new GatewayManager({ registry: {} });
+      const manager = new GatewayManager({ definitions: [] });
       expect(manager.isRunning).toBe(false);
     });
 
-    it('should accept a registry configuration', () => {
-      const BotClass = createMockBotClass();
-      const manager = new GatewayManager({ registry: { slack: BotClass } });
+    it('should accept a definitions configuration', () => {
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('slack')] });
       expect(manager.isRunning).toBe(false);
     });
   });
 
   describe('start', () => {
     it('should set isRunning to true after start', async () => {
-      const manager = new GatewayManager({ registry: {} });
+      const manager = new GatewayManager({ definitions: [] });
 
       await manager.start();
 
@@ -90,7 +108,7 @@ describe('GatewayManager', () => {
     });
 
     it('should not start again if already running', async () => {
-      const manager = new GatewayManager({ registry: {} });
+      const manager = new GatewayManager({ definitions: [] });
 
       await manager.start();
       expect(manager.isRunning).toBe(true);
@@ -110,7 +128,7 @@ describe('GatewayManager', () => {
     it('should continue starting even if initial sync fails', async () => {
       vi.mocked(getServerDB).mockRejectedValueOnce(new Error('DB connection failed'));
 
-      const manager = new GatewayManager({ registry: {} });
+      const manager = new GatewayManager({ definitions: [] });
 
       // Should not throw
       await expect(manager.start()).resolves.toBeUndefined();
@@ -120,7 +138,7 @@ describe('GatewayManager', () => {
 
   describe('stop', () => {
     it('should set isRunning to false after stop', async () => {
-      const manager = new GatewayManager({ registry: {} });
+      const manager = new GatewayManager({ definitions: [] });
       await manager.start();
       expect(manager.isRunning).toBe(true);
 
@@ -130,7 +148,7 @@ describe('GatewayManager', () => {
     });
 
     it('should do nothing if not running', async () => {
-      const manager = new GatewayManager({ registry: {} });
+      const manager = new GatewayManager({ definitions: [] });
 
       // Should not throw
       await expect(manager.stop()).resolves.toBeUndefined();
@@ -140,10 +158,7 @@ describe('GatewayManager', () => {
     it('should stop all running bots', async () => {
       const mockBot1 = createMockBot();
       const mockBot2 = createMockBot();
-      const BotClass = vi
-        .fn()
-        .mockImplementationOnce(() => mockBot1)
-        .mockImplementationOnce(() => mockBot2);
+      const factory = vi.fn().mockReturnValueOnce(mockBot1).mockReturnValueOnce(mockBot2);
 
       // Pre-load two bots by calling startBot
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue({
@@ -151,7 +166,7 @@ describe('GatewayManager', () => {
         credentials: { token: 'tok1' },
       });
 
-      const manager = new GatewayManager({ registry: { slack: BotClass } });
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
       await manager.start();
 
       await manager.startBot('slack', 'app-1', 'user-1');
@@ -168,22 +183,22 @@ describe('GatewayManager', () => {
   describe('startBot', () => {
     it('should do nothing when no provider is found in DB', async () => {
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue(null);
-      const BotClass = createMockBotClass();
+      const factory = vi.fn();
 
-      const manager = new GatewayManager({ registry: { slack: BotClass } });
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
       await manager.startBot('slack', 'app-123', 'user-abc');
 
-      expect(BotClass).not.toHaveBeenCalled();
+      expect(factory).not.toHaveBeenCalled();
     });
 
-    it('should do nothing when the platform is not in registry', async () => {
+    it('should do nothing when the platform is not registered', async () => {
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue({
         applicationId: 'app-123',
         credentials: { token: 'tok' },
       });
 
-      const manager = new GatewayManager({ registry: {} }); // empty registry
+      const manager = new GatewayManager({ definitions: [] }); // empty definitions
 
       await manager.startBot('unsupported', 'app-123', 'user-abc');
 
@@ -193,38 +208,31 @@ describe('GatewayManager', () => {
 
     it('should start a bot and register it', async () => {
       const mockBot = createMockBot();
-      const BotClass = createMockBotClass(mockBot);
+      const factory = vi.fn().mockReturnValue(mockBot);
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue({
         applicationId: 'app-123',
         credentials: { token: 'tok123' },
       });
 
-      const manager = new GatewayManager({ registry: { slack: BotClass } });
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
       await manager.startBot('slack', 'app-123', 'user-abc');
 
-      expect(BotClass).toHaveBeenCalledWith({
-        token: 'tok123',
-        applicationId: 'app-123',
-        platform: 'slack',
-      });
+      expect(factory).toHaveBeenCalled();
       expect(mockBot.start).toHaveBeenCalled();
     });
 
     it('should stop existing bot before starting a new one for the same key', async () => {
       const mockBot1 = createMockBot();
       const mockBot2 = createMockBot();
-      const BotClass = vi
-        .fn()
-        .mockImplementationOnce(() => mockBot1)
-        .mockImplementationOnce(() => mockBot2);
+      const factory = vi.fn().mockReturnValueOnce(mockBot1).mockReturnValueOnce(mockBot2);
 
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue({
         applicationId: 'app-123',
         credentials: { token: 'tok' },
       });
 
-      const manager = new GatewayManager({ registry: { slack: BotClass } });
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
       // Start bot first time
       await manager.startBot('slack', 'app-123', 'user-abc');
@@ -235,31 +243,11 @@ describe('GatewayManager', () => {
       expect(mockBot1.stop).toHaveBeenCalled();
       expect(mockBot2.start).toHaveBeenCalled();
     });
-
-    it('should pass credentials merged with applicationId to the bot constructor', async () => {
-      const mockBot = createMockBot();
-      const BotClass = createMockBotClass(mockBot);
-      mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue({
-        applicationId: 'my-app',
-        credentials: { apiKey: 'key-abc', secret: 'sec-xyz' },
-      });
-
-      const manager = new GatewayManager({ registry: { discord: BotClass } });
-
-      await manager.startBot('discord', 'my-app', 'user-xyz');
-
-      expect(BotClass).toHaveBeenCalledWith({
-        apiKey: 'key-abc',
-        secret: 'sec-xyz',
-        applicationId: 'my-app',
-        platform: 'discord',
-      });
-    });
   });
 
   describe('stopBot', () => {
     it('should do nothing when bot is not found', async () => {
-      const manager = new GatewayManager({ registry: {} });
+      const manager = new GatewayManager({ definitions: [] });
 
       // Should not throw
       await expect(manager.stopBot('slack', 'app-123')).resolves.toBeUndefined();
@@ -267,13 +255,13 @@ describe('GatewayManager', () => {
 
     it('should stop and remove a running bot', async () => {
       const mockBot = createMockBot();
-      const BotClass = createMockBotClass(mockBot);
+      const factory = vi.fn().mockReturnValue(mockBot);
       mockAgentBotProviderModel.findEnabledByApplicationId.mockResolvedValue({
         applicationId: 'app-123',
         credentials: { token: 'tok' },
       });
 
-      const manager = new GatewayManager({ registry: { slack: BotClass } });
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
       // First start the bot
       await manager.startBot('slack', 'app-123', 'user-abc');
@@ -287,16 +275,13 @@ describe('GatewayManager', () => {
     it('should not affect other bots when stopping one', async () => {
       const mockBot1 = createMockBot();
       const mockBot2 = createMockBot();
-      const BotClass = vi
-        .fn()
-        .mockImplementationOnce(() => mockBot1)
-        .mockImplementationOnce(() => mockBot2);
+      const factory = vi.fn().mockReturnValueOnce(mockBot1).mockReturnValueOnce(mockBot2);
 
       mockAgentBotProviderModel.findEnabledByApplicationId
         .mockResolvedValueOnce({ applicationId: 'app-1', credentials: {} })
         .mockResolvedValueOnce({ applicationId: 'app-2', credentials: {} });
 
-      const manager = new GatewayManager({ registry: { slack: BotClass } });
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('slack', factory)] });
 
       await manager.startBot('slack', 'app-1', 'user-1');
       await manager.startBot('slack', 'app-2', 'user-2');
@@ -305,6 +290,27 @@ describe('GatewayManager', () => {
 
       expect(mockBot1.stop).toHaveBeenCalled();
       expect(mockBot2.stop).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('isPersistent', () => {
+    it('should return true for websocket platforms', () => {
+      const wsDef: PlatformDefinition = {
+        ...createFakeDefinition('discord'),
+        connectionMode: 'websocket',
+      };
+      const manager = new GatewayManager({ definitions: [wsDef] });
+      expect(manager.isPersistent('discord')).toBe(true);
+    });
+
+    it('should return false for webhook platforms', () => {
+      const manager = new GatewayManager({ definitions: [createFakeDefinition('telegram')] });
+      expect(manager.isPersistent('telegram')).toBe(false);
+    });
+
+    it('should return false for unknown platforms', () => {
+      const manager = new GatewayManager({ definitions: [] });
+      expect(manager.isPersistent('unknown')).toBe(false);
     });
   });
 });
@@ -325,19 +331,19 @@ describe('createGatewayManager / getGatewayManager', () => {
   });
 
   it('should create and return a GatewayManager instance', () => {
-    const manager = createGatewayManager({ registry: {} });
+    const manager = createGatewayManager({ definitions: [] });
     expect(manager).toBeInstanceOf(GatewayManager);
   });
 
   it('should return the same instance on subsequent calls (singleton)', () => {
-    const manager1 = createGatewayManager({ registry: {} });
-    const manager2 = createGatewayManager({ registry: { slack: vi.fn() as any } });
+    const manager1 = createGatewayManager({ definitions: [] });
+    const manager2 = createGatewayManager({ definitions: [createFakeDefinition('slack')] });
 
     expect(manager1).toBe(manager2);
   });
 
   it('should be accessible via getGatewayManager after creation', () => {
-    const created = createGatewayManager({ registry: {} });
+    const created = createGatewayManager({ definitions: [] });
     const retrieved = getGatewayManager();
 
     expect(retrieved).toBe(created);

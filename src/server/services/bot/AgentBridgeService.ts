@@ -1,3 +1,4 @@
+import type { PlatformClient } from '@lobechat/bot-platform';
 import type { ChatTopicBotContext } from '@lobechat/types';
 import type { Message, SentMessage, Thread } from 'chat';
 import { emoji } from 'chat';
@@ -66,21 +67,6 @@ async function safeReaction(fn: () => Promise<void>, label: string): Promise<voi
   }
 }
 
-/**
- * Extract the parent channel thread ID for reacting to the original mention message.
- * In Discord, when a thread is created on a message, that message still belongs to
- * the parent channel. To add/remove reactions on it, we need to use the parent channel ID.
- *
- * e.g. "discord:guild:parentChannel:thread" → "discord:guild:parentChannel"
- */
-function parentChannelThreadId(threadId: string): string {
-  const parts = threadId.split(':');
-  if (parts.length >= 4 && parts[0] === 'discord') {
-    return `discord:${parts[1]}:${parts[2]}`;
-  }
-  return threadId;
-}
-
 interface DiscordChannelContext {
   channel: { id: string; name?: string; topic?: string; type?: number };
   guild: { id: string };
@@ -94,6 +80,7 @@ interface ThreadState {
 interface BridgeHandlerOpts {
   agentId: string;
   botContext?: ChatTopicBotContext;
+  connector?: PlatformClient;
 }
 
 /**
@@ -202,7 +189,9 @@ export class AgentBridgeService {
     const first = messages[0];
     const mergedText = messages.map((m) => m.text).join('\n');
 
-    return { ...first, text: mergedText };
+    return Object.assign(Object.create(Object.getPrototypeOf(first)), first, {
+      text: mergedText,
+    });
   }
 
   constructor(db: LobeChatDatabase, userId: string) {
@@ -257,22 +246,15 @@ export class AgentBridgeService {
     AgentBridgeService.activeThreads.add(thread.id);
 
     // Immediate feedback: mark as received + show typing
-    // The mention message lives in the parent channel (not the thread), so we strip
-    // the thread segment from the ID to target the parent channel for reactions.
+    const { connector } = opts;
     await safeReaction(
-      () =>
-        thread.adapter.addReaction(parentChannelThreadId(thread.id), message.id, RECEIVED_EMOJI),
+      () => thread.adapter.addReaction(thread.id, message.id, RECEIVED_EMOJI),
       'add eyes',
     );
 
-    // Only subscribe to actual Discord threads, not regular channels.
-    // Subscribing to a regular channel would cause the bot to respond to ALL messages in it.
-    // Discord thread ID format: "discord:guild:channel[:thread]" — the 4th segment is present
-    // only when the message is inside a Discord thread.
-    const isDiscordTopLevelChannel =
-      botContext?.platform === 'discord' &&
-      !(thread.adapter.decodeThreadId(thread.id) as { threadId?: string }).threadId;
-    if (!isDiscordTopLevelChannel) {
+    // Auto-subscribe to thread (platforms can opt out, e.g. Discord top-level channels)
+    const subscribe = connector?.shouldSubscribe?.(thread.id) ?? true;
+    if (subscribe) {
       await thread.subscribe();
     }
 
@@ -295,13 +277,13 @@ export class AgentBridgeService {
         agentId,
         botContext,
         channelContext,
-        reactionThreadId: parentChannelThreadId(thread.id),
+        connector,
         trigger: 'bot',
       });
 
       // Persist topic mapping and channel context in thread state for follow-up messages
-      // Skip for non-threaded Discord channels (no subscribe = no follow-up)
-      if (topicId && !isDiscordTopLevelChannel) {
+      // Skip if the platform opted out of auto-subscribe (no subscribe = no follow-up)
+      if (topicId && subscribe) {
         await thread.setState({ channelContext, topicId });
         log('handleMention: stored topicId=%s in thread=%s state', topicId, thread.id);
       }
@@ -314,8 +296,7 @@ export class AgentBridgeService {
       clearInterval(typingInterval);
       // In queue mode, reaction is removed by the bot-callback webhook on completion
       if (!queueMode) {
-        // Mention message is in parent channel
-        await this.removeReceivedReaction(thread, message, parentChannelThreadId(thread.id));
+        await this.removeReceivedReaction(thread, message);
       }
     }
   }
@@ -393,6 +374,7 @@ export class AgentBridgeService {
         agentId,
         botContext,
         channelContext,
+        connector: opts.connector,
         topicId,
         trigger: 'bot',
       });
@@ -431,8 +413,7 @@ export class AgentBridgeService {
       agentId: string;
       botContext?: ChatTopicBotContext;
       channelContext?: DiscordChannelContext;
-      /** Thread ID to use for removing the user message reaction in queue mode */
-      reactionThreadId?: string;
+      connector?: PlatformClient;
       topicId?: string;
       trigger?: string;
     },
@@ -455,12 +436,11 @@ export class AgentBridgeService {
       agentId: string;
       botContext?: ChatTopicBotContext;
       channelContext?: DiscordChannelContext;
-      reactionThreadId?: string;
       topicId?: string;
       trigger?: string;
     },
   ): Promise<{ reply: string; topicId: string }> {
-    const { agentId, botContext, channelContext, reactionThreadId, topicId, trigger } = opts;
+    const { agentId, botContext, channelContext, topicId, trigger } = opts;
 
     const aiAgentService = new AiAgentService(this.db, this.userId);
     const timezone = await this.loadTimezone();
@@ -490,15 +470,10 @@ export class AgentBridgeService {
     }
     const callbackUrl = urlJoin(baseURL, '/api/agent/webhooks/bot-callback');
 
-    // Shared webhook body with bot context
-    // reactionChannelId: the Discord channel where the user message lives (for reaction removal).
-    // For mention messages this is the parent channel; for thread messages it's the thread itself.
-    const reactionChannelId = reactionThreadId ? reactionThreadId.split(':')[2] : undefined;
     const webhookBody = {
       applicationId: botContext?.applicationId,
       platformThreadId: botContext?.platformThreadId,
       progressMessageId,
-      reactionChannelId,
       userMessageId: userMessage.id,
     };
 
@@ -552,11 +527,12 @@ export class AgentBridgeService {
       agentId: string;
       botContext?: ChatTopicBotContext;
       channelContext?: DiscordChannelContext;
+      connector?: PlatformClient;
       topicId?: string;
       trigger?: string;
     },
   ): Promise<{ reply: string; topicId: string }> {
-    const { agentId, botContext, channelContext, topicId, trigger } = opts;
+    const { agentId, botContext, channelContext, connector, topicId, trigger } = opts;
 
     const aiAgentService = new AiAgentService(this.db, this.userId);
     const timezone = await this.loadTimezone();
@@ -568,8 +544,6 @@ export class AgentBridgeService {
     } catch (error) {
       log('executeWithInMemoryCallbacks: failed to post progress message: %O', error);
     }
-
-    const platform = botContext?.platform;
 
     // Track the last LLM content and tool calls for showing during tool execution
     let lastLLMContent = '';
@@ -618,14 +592,20 @@ export class AgentBridgeService {
 
               if (toolsCalling) totalToolCalls += toolsCalling.length;
 
-              const progressText = renderStepProgress({
+              const msgBody = renderStepProgress({
                 ...stepData,
                 elapsedMs: getElapsedMs(),
                 lastContent: lastLLMContent,
                 lastToolsCalling,
-                platform,
                 totalToolCalls,
               });
+
+              const stats = {
+                elapsedMs: getElapsedMs(),
+                totalCost: stepData.totalCost ?? 0,
+                totalTokens: stepData.totalTokens ?? 0,
+              };
+              const progressText = connector?.formatReply?.(msgBody, stats) ?? msgBody;
 
               if (content) lastLLMContent = content;
               if (toolsCalling) lastToolsCalling = toolsCalling;
@@ -665,14 +645,15 @@ export class AgentBridgeService {
                   )?.content;
 
                 if (lastAssistantContent) {
-                  const finalText = renderFinalReply(lastAssistantContent, {
+                  const replyBody = renderFinalReply(lastAssistantContent);
+                  const replyStats = {
                     elapsedMs: getElapsedMs(),
                     llmCalls: finalState.usage?.llm?.apiCalls ?? 0,
-                    platform,
                     toolCalls: finalState.usage?.tools?.totalCalls ?? 0,
                     totalCost: finalState.cost?.total ?? 0,
                     totalTokens: finalState.usage?.llm?.tokens?.total ?? 0,
-                  });
+                  };
+                  const finalText = connector?.formatReply?.(replyBody, replyStats) ?? replyBody;
 
                   // TODO: resolve charLimit from settings when entry-based registry is wired
                   const chunks = splitMessage(finalText);
@@ -886,18 +867,13 @@ export class AgentBridgeService {
 
   /**
    * Remove the received reaction from a user message (fire-and-forget).
-   * @param reactionThreadId - The thread ID to use for the reaction API call.
-   *   For messages in parent channels (handleMention), use parentChannelThreadId(thread.id).
-   *   For messages inside threads (handleSubscribedMessage), use thread.id directly.
    */
   private async removeReceivedReaction(
     thread: Thread<ThreadState>,
     message: Message,
-    reactionThreadId?: string,
   ): Promise<void> {
     await safeReaction(
-      () =>
-        thread.adapter.removeReaction(reactionThreadId ?? thread.id, message.id, RECEIVED_EMOJI),
+      () => thread.adapter.removeReaction(thread.id, message.id, RECEIVED_EMOJI),
       'remove eyes',
     );
   }

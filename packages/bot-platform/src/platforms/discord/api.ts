@@ -2,9 +2,9 @@ import { REST } from '@discordjs/rest';
 import debug from 'debug';
 import { type RESTPostAPIChannelMessageResult, Routes } from 'discord-api-types/v10';
 
-const log = debug('lobe-server:bot:discord-client');
+const log = debug('bot-platform:discord:client');
 
-export class DiscordPlatformClient {
+export class DiscordApi {
   private readonly rest: REST;
 
   constructor(botToken: string) {

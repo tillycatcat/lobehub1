@@ -1,5 +1,5 @@
-import type { BotPlatformEntry, PlatformSettingsSchema } from '../../types';
-import { discordBotFactory } from './bot';
+import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
+import { discordClientFactory } from './client';
 import { discordWebhookResolver } from './resolveWebhook';
 
 const settingsSchema: PlatformSettingsSchema = {
@@ -16,6 +16,12 @@ const settingsSchema: PlatformSettingsSchema = {
       minimum: 0,
       title: 'Message Merge Window (ms)',
       type: 'number',
+    },
+    showUsageStats: {
+      default: false,
+      description: 'Show token usage, cost, and duration stats in bot replies',
+      title: 'Show Usage Stats',
+      type: 'boolean',
     },
     dm: {
       properties: {
@@ -35,12 +41,14 @@ const settingsSchema: PlatformSettingsSchema = {
   type: 'object',
 };
 
-export const discordWebsocketEntry: BotPlatformEntry = {
+export const discordWebsocket: PlatformDefinition = {
   platform: 'discord',
   connectionMode: 'websocket',
   description: 'Connect your Discord server with a bot powered by Gateway WebSocket',
   displayName: 'Discord',
   portalUrl: 'https://discord.com/developers/applications',
+  sanitizeUserInput: (text, applicationId) =>
+    text.replaceAll(new RegExp(`<@!?${applicationId}>\\s*`, 'g'), '').trim(),
 
   credentials: [
     { key: 'botToken', label: 'Bot Token', required: true, type: 'secret' },
@@ -49,6 +57,6 @@ export const discordWebsocketEntry: BotPlatformEntry = {
   ],
   settings: settingsSchema,
 
-  createBot: discordBotFactory,
+  createClient: discordClientFactory,
   resolveWebhook: discordWebhookResolver,
 };

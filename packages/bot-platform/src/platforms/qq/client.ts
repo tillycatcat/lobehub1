@@ -1,11 +1,11 @@
-import { createQQAdapter, QQApiClient } from '@lobechat/adapter-qq';
+import { createQQAdapter, QQApiClient } from '@lobechat/chat-adapter-qq';
 import debug from 'debug';
 
 import type {
   BotPlatformRuntimeContext,
   BotProviderConfig,
-  PlatformBot,
-  PlatformBotFactory,
+  PlatformClient,
+  PlatformClientFactory,
   PlatformMessenger,
 } from '../../types';
 
@@ -48,7 +48,7 @@ async function sendQQMessage(
   }
 }
 
-class QQWebhookBot implements PlatformBot {
+class QQWebhookClient implements PlatformClient {
   readonly platform = 'qq';
   readonly applicationId: string;
 
@@ -111,9 +111,9 @@ class QQWebhookBot implements PlatformBot {
   }
 }
 
-export const qqBotFactory: PlatformBotFactory = (
+export const qqClientFactory: PlatformClientFactory = (
   account: BotProviderConfig,
   context: BotPlatformRuntimeContext,
-): PlatformBot => {
-  return new QQWebhookBot(account, context);
+): PlatformClient => {
+  return new QQWebhookClient(account, context);
 };
