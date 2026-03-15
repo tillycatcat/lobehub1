@@ -1,6 +1,10 @@
 import debug from 'debug';
 
-import { getAllDefinitions, getDefinition } from '../bot/platforms';
+import { getServerDB } from '@/database/core/db-adaptor';
+import { AgentBotProviderModel } from '@/database/models/agentBotProvider';
+import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
+
+import { getAllDefinitions } from '../bot/platforms';
 import { BotConnectQueue } from './botConnectQueue';
 import { createGatewayManager, getGatewayManager } from './GatewayManager';
 
@@ -36,10 +40,10 @@ export class GatewayService {
     userId: string,
   ): Promise<'started' | 'queued'> {
     if (isVercel) {
-      const def = getDefinition(platform);
-      const isPersistent = def?.connectionMode === 'websocket';
+      // Query DB to determine connection mode from user settings
+      const connectionMode = await this.getConnectionMode(platform, applicationId, userId);
 
-      if (isPersistent) {
+      if (connectionMode === 'websocket') {
         // Persistent platforms (e.g. Discord WebSocket) cannot run in a
         // serverless function — queue for the long-running cron gateway.
         const queue = new BotConnectQueue();
@@ -48,8 +52,8 @@ export class GatewayService {
         return 'queued';
       }
 
-      // Webhook-based platforms (Telegram, Lark, etc.) only need a single HTTP
-      // call, so we can run directly in a Vercel serverless function.
+      // Webhook-based platforms only need a single HTTP call,
+      // so we can run directly in a Vercel serverless function.
       const manager = createGatewayManager({ definitions: getAllDefinitions() });
       await manager.startBot(platform, applicationId, userId);
       log('Started bot %s:%s (direct)', platform, applicationId);
@@ -74,5 +78,26 @@ export class GatewayService {
 
     await manager.stopBot(platform, applicationId);
     log('Stopped bot %s:%s', platform, applicationId);
+  }
+
+  /**
+   * Read the connectionMode from the bot provider's settings.
+   * Defaults to 'webhook' if not configured.
+   */
+  private async getConnectionMode(
+    platform: string,
+    applicationId: string,
+    userId: string,
+  ): Promise<string> {
+    try {
+      const serverDB = await getServerDB();
+      const gateKeeper = await KeyVaultsGateKeeper.initWithEnvKey();
+      const model = new AgentBotProviderModel(serverDB, userId, gateKeeper);
+      const provider = await model.findEnabledByApplicationId(platform, applicationId);
+      return (provider?.settings as any)?.connectionMode || 'webhook';
+    } catch (err) {
+      log('Failed to read connectionMode for %s:%s: %O', platform, applicationId, err);
+      return 'webhook';
+    }
   }
 }

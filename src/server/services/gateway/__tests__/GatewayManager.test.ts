@@ -28,25 +28,26 @@ vi.mock('@/server/modules/KeyVaultsEncrypt', () => ({
 
 // Fake platform definition for testing
 const fakeDefinition: PlatformDefinition = {
-  connectionMode: 'webhook',
-  createClient: (config) => ({
-    applicationId: config.applicationId,
-    createAdapter: () => ({}),
-    extractChatId: (id: string) => id,
-    getMessenger: () => ({
-      createMessage: async () => {},
-      editMessage: async () => {},
-      removeReaction: async () => {},
-      triggerTyping: async () => {},
+  adapterFactory: {
+    createClient: (config) => ({
+      applicationId: config.applicationId,
+      createAdapter: () => ({}),
+      extractChatId: (id: string) => id,
+      getMessenger: () => ({
+        createMessage: async () => {},
+        editMessage: async () => {},
+        removeReaction: async () => {},
+        triggerTyping: async () => {},
+      }),
+      parseMessageId: (id: string) => id,
+      id: config.platform,
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn().mockResolvedValue(undefined),
     }),
-    parseMessageId: (id: string) => id,
-    platform: config.platform,
-    start: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
-  }),
+  },
   credentials: [],
-  displayName: 'Fake Platform',
-  platform: 'fakeplatform',
+  name: 'Fake Platform',
+  id: 'fakeplatform',
 };
 
 const FAKE_DB = {} as any;
@@ -171,18 +172,6 @@ describe('GatewayManager', () => {
       // With no definitions, no bots should be created
       await managerWithEmpty.start();
       expect(managerWithEmpty.isRunning).toBe(true);
-    });
-  });
-
-  describe('isPersistent', () => {
-    it('should return true for websocket platforms', () => {
-      const wsDef: PlatformDefinition = { ...fakeDefinition, connectionMode: 'websocket' };
-      const mgr = new GatewayManager({ definitions: [wsDef] });
-      expect(mgr.isPersistent('fakeplatform')).toBe(true);
-    });
-
-    it('should return false for webhook platforms', () => {
-      expect(manager.isPersistent('fakeplatform')).toBe(false);
     });
   });
 

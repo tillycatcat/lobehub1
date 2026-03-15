@@ -63,30 +63,31 @@ const mockCreateAdapter = vi.hoisted(() =>
 const mockOnRegistered = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('../platforms', () => ({
-  getAllPlatforms: vi.fn().mockReturnValue(['discord', 'telegram', 'lark']),
+  getAllPlatforms: vi.fn().mockReturnValue(['discord', 'telegram', 'feishu']),
   getDefinition: vi.fn().mockImplementation((platform: string) => {
     if (platform === 'unknown') return undefined;
     return {
-      connectionMode: platform === 'discord' ? 'websocket' : 'webhook',
-      createClient: vi.fn().mockReturnValue({
-        applicationId: 'mock-app',
-        createAdapter: mockCreateAdapter,
-        extractChatId: (id: string) => id.split(':')[1],
-        getMessenger: () => ({
-          createMessage: vi.fn(),
-          editMessage: vi.fn(),
-          removeReaction: vi.fn(),
-          triggerTyping: vi.fn(),
+      adapterFactory: {
+        createClient: vi.fn().mockReturnValue({
+          applicationId: 'mock-app',
+          createAdapter: mockCreateAdapter,
+          extractChatId: (id: string) => id.split(':')[1],
+          getMessenger: () => ({
+            createMessage: vi.fn(),
+            editMessage: vi.fn(),
+            removeReaction: vi.fn(),
+            triggerTyping: vi.fn(),
+          }),
+          onRegistered: mockOnRegistered,
+          parseMessageId: (id: string) => id,
+          id: platform,
+          start: vi.fn(),
+          stop: vi.fn(),
         }),
-        onRegistered: mockOnRegistered,
-        parseMessageId: (id: string) => id,
-        platform,
-        start: vi.fn(),
-        stop: vi.fn(),
-      }),
+      },
       credentials: [],
-      displayName: platform,
-      platform,
+      name: platform,
+      id: platform,
     };
   }),
 }));
@@ -130,7 +131,7 @@ describe('BotMessageRouter', () => {
       await router.initialize();
 
       // Should query each platform in the entry registry
-      expect(mockFindEnabledByPlatform).toHaveBeenCalledTimes(3); // discord, telegram, lark
+      expect(mockFindEnabledByPlatform).toHaveBeenCalledTimes(3); // discord, telegram, feishu
     });
 
     it('should create bots for enabled providers', async () => {

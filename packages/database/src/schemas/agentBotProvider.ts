@@ -36,9 +36,6 @@ export const agentBotProviders = pgTable(
     /** Platform identifier: 'discord' | 'slack' | 'feishu' | ... */
     platform: varchar('platform', { length: 50 }).notNull(),
 
-    /** Connection mode: how this bot connects to the platform */
-    connectionMode: varchar('connection_mode', { length: 20 }).notNull().default('webhook'),
-
     /** Platform-specific application/bot ID used for webhook routing */
     applicationId: varchar('application_id', { length: 255 }).notNull(),
 
@@ -53,12 +50,8 @@ export const agentBotProviders = pgTable(
     ...timestamps,
   },
   (t) => [
-    // Fast webhook lookup: platform + connectionMode + applicationId → agent
-    uniqueIndex('agent_bot_providers_platform_conn_app_id_unique').on(
-      t.platform,
-      t.connectionMode,
-      t.applicationId,
-    ),
+    // Fast lookup: platform + applicationId → agent
+    uniqueIndex('agent_bot_providers_platform_app_id_unique').on(t.platform, t.applicationId),
     index('agent_bot_providers_platform_idx').on(t.platform),
     index('agent_bot_providers_agent_id_idx').on(t.agentId),
     index('agent_bot_providers_user_id_idx').on(t.userId),

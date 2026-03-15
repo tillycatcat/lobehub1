@@ -41,21 +41,20 @@ const createMockBot = (): PlatformClient => ({
     triggerTyping: async () => {},
   }),
   parseMessageId: (id: string) => id,
-  platform: 'slack',
+  id: 'slack',
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(undefined),
 });
 
 // Helper: create a fake definition with a factory that returns the given bot
 const createFakeDefinition = (
-  platform: string,
+  id: string,
   factoryFn?: (...args: any[]) => PlatformClient,
 ): PlatformDefinition => ({
-  connectionMode: 'webhook',
-  createClient: factoryFn || (() => createMockBot()),
+  adapterFactory: { createClient: factoryFn || (() => createMockBot()) },
   credentials: [],
-  displayName: platform,
-  platform,
+  name: id,
+  id,
 });
 
 describe('GatewayManager', () => {
@@ -290,27 +289,6 @@ describe('GatewayManager', () => {
 
       expect(mockBot1.stop).toHaveBeenCalled();
       expect(mockBot2.stop).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('isPersistent', () => {
-    it('should return true for websocket platforms', () => {
-      const wsDef: PlatformDefinition = {
-        ...createFakeDefinition('discord'),
-        connectionMode: 'websocket',
-      };
-      const manager = new GatewayManager({ definitions: [wsDef] });
-      expect(manager.isPersistent('discord')).toBe(true);
-    });
-
-    it('should return false for webhook platforms', () => {
-      const manager = new GatewayManager({ definitions: [createFakeDefinition('telegram')] });
-      expect(manager.isPersistent('telegram')).toBe(false);
-    });
-
-    it('should return false for unknown platforms', () => {
-      const manager = new GatewayManager({ definitions: [] });
-      expect(manager.isPersistent('unknown')).toBe(false);
     });
   });
 });

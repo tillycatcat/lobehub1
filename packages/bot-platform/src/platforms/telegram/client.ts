@@ -2,11 +2,12 @@ import { createTelegramAdapter } from '@chat-adapter/telegram';
 import debug from 'debug';
 
 import type {
+  AdapterFactory,
   BotPlatformRuntimeContext,
   BotProviderConfig,
   PlatformClient,
-  PlatformClientFactory,
   PlatformMessenger,
+  ValidationResult,
 } from '../../types';
 import { TELEGRAM_API_BASE, TelegramApi } from './api';
 import { extractBotId, setTelegramWebhook } from './helpers';
@@ -23,7 +24,7 @@ function parseTelegramMessageId(compositeId: string): number {
 }
 
 class TelegramWebhookClient implements PlatformClient {
-  readonly platform = 'telegram';
+  readonly id = 'telegram';
   readonly applicationId: string;
 
   private config: BotProviderConfig;
@@ -103,9 +104,25 @@ class TelegramWebhookClient implements PlatformClient {
   }
 }
 
-export const telegramClientFactory: PlatformClientFactory = (
-  account: BotProviderConfig,
-  context: BotPlatformRuntimeContext,
-): PlatformClient => {
-  return new TelegramWebhookClient(account, context);
-};
+export class TelegramAdapterFactory implements AdapterFactory {
+  createClient(config: BotProviderConfig, context: BotPlatformRuntimeContext): PlatformClient {
+    return new TelegramWebhookClient(config, context);
+  }
+
+  async validateCredentials(credentials: Record<string, string>): Promise<ValidationResult> {
+    if (!credentials.botToken) {
+      return { errors: [{ field: 'botToken', message: 'Bot Token is required' }], valid: false };
+    }
+
+    try {
+      const res = await fetch(`${TELEGRAM_API_BASE}/bot${credentials.botToken}/getMe`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return { valid: true };
+    } catch {
+      return {
+        errors: [{ field: 'botToken', message: 'Failed to authenticate with Telegram API' }],
+        valid: false,
+      };
+    }
+  }
+}

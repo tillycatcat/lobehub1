@@ -3,12 +3,13 @@ import { createDiscordAdapter } from '@chat-adapter/discord';
 import debug from 'debug';
 
 import type {
+  AdapterFactory,
   BotPlatformRuntimeContext,
   BotProviderConfig,
   PlatformClient,
-  PlatformClientFactory,
   PlatformMessenger,
   UsageStats,
+  ValidationResult,
 } from '../../types';
 import { formatUsageStats } from '../../utils';
 import { DiscordApi } from './api';
@@ -28,7 +29,7 @@ function extractChannelId(platformThreadId: string): string {
 }
 
 class DiscordGatewayClient implements PlatformClient {
-  readonly platform = 'discord';
+  readonly id = 'discord';
   readonly applicationId: string;
 
   private abort = new AbortController();
@@ -176,9 +177,31 @@ class DiscordGatewayClient implements PlatformClient {
   }
 }
 
-export const discordClientFactory: PlatformClientFactory = (
-  account: BotProviderConfig,
-  context: BotPlatformRuntimeContext,
-): PlatformClient => {
-  return new DiscordGatewayClient(account, context);
-};
+export class DiscordAdapterFactory implements AdapterFactory {
+  createClient(config: BotProviderConfig, context: BotPlatformRuntimeContext): PlatformClient {
+    return new DiscordGatewayClient(config, context);
+  }
+
+  async validateCredentials(credentials: Record<string, string>): Promise<ValidationResult> {
+    const errors: Array<{ field: string; message: string }> = [];
+
+    if (!credentials.botToken) errors.push({ field: 'botToken', message: 'Bot Token is required' });
+    if (!credentials.publicKey)
+      errors.push({ field: 'publicKey', message: 'Public Key is required' });
+
+    if (errors.length > 0) return { errors, valid: false };
+
+    try {
+      const res = await fetch('https://discord.com/api/v10/users/@me', {
+        headers: { Authorization: `Bot ${credentials.botToken}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return { valid: true };
+    } catch {
+      return {
+        errors: [{ field: 'botToken', message: 'Failed to authenticate with Discord API' }],
+        valid: false,
+      };
+    }
+  }
+}

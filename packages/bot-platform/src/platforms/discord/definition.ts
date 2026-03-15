@@ -1,9 +1,17 @@
 import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
-import { discordClientFactory } from './client';
+import { DiscordAdapterFactory } from './client';
 import { discordWebhookResolver } from './resolveWebhook';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
+    connectionMode: {
+      default: 'websocket',
+      description: 'How the bot connects to Discord',
+      enum: ['websocket', 'webhook'],
+      enumLabels: ['WebSocket (Gateway)', 'Webhook'],
+      title: 'Connection Mode',
+      type: 'string',
+    },
     charLimit: {
       default: 2000,
       minimum: 100,
@@ -41,12 +49,14 @@ const settingsSchema: PlatformSettingsSchema = {
   type: 'object',
 };
 
-export const discordWebsocket: PlatformDefinition = {
-  platform: 'discord',
-  connectionMode: 'websocket',
-  description: 'Connect your Discord server with a bot powered by Gateway WebSocket',
-  displayName: 'Discord',
-  portalUrl: 'https://discord.com/developers/applications',
+export const discord: PlatformDefinition = {
+  id: 'discord',
+  description: 'Connect a Discord bot',
+  name: 'Discord',
+  documentation: {
+    portalUrl: 'https://discord.com/developers/applications',
+    setupGuideUrl: 'https://lobehub.com/docs/usage/channels/discord',
+  },
   sanitizeUserInput: (text, applicationId) =>
     text.replaceAll(new RegExp(`<@!?${applicationId}>\\s*`, 'g'), '').trim(),
 
@@ -57,6 +67,6 @@ export const discordWebsocket: PlatformDefinition = {
   ],
   settings: settingsSchema,
 
-  createClient: discordClientFactory,
+  adapterFactory: new DiscordAdapterFactory(),
   resolveWebhook: discordWebhookResolver,
 };

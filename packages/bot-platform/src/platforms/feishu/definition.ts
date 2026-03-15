@@ -1,5 +1,5 @@
 import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
-import { TelegramAdapterFactory } from './client';
+import { FeishuAdapterFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
@@ -30,37 +30,46 @@ const settingsSchema: PlatformSettingsSchema = {
       title: 'Direct Messages',
       type: 'object',
     },
+    domain: {
+      default: 'feishu',
+      description: 'Lark (international) tenants should set this to "lark"',
+      enum: ['feishu', 'lark'],
+      enumLabels: ['飞书 (China)', 'Lark (International)'],
+      title: 'Domain',
+      type: 'string',
+    },
   },
   type: 'object',
 };
 
-export const telegram: PlatformDefinition = {
-  id: 'telegram',
-  description: 'Connect a Telegram bot',
-  name: 'Telegram',
+export const feishu: PlatformDefinition = {
+  id: 'feishu',
+  description: 'Connect a Feishu / Lark bot',
+  name: 'Feishu / Lark',
   documentation: {
-    portalUrl: 'https://t.me/BotFather',
-    setupGuideUrl: 'https://lobehub.com/docs/usage/channels/telegram',
+    portalUrl: 'https://open.feishu.cn/app',
+    setupGuideUrl: 'https://lobehub.com/docs/usage/channels/feishu',
   },
 
   credentials: [
-    { key: 'botToken', label: 'Bot Token', required: true, type: 'secret' },
+    { key: 'appId', label: 'App ID', required: true, type: 'string' },
+    { key: 'appSecret', label: 'App Secret', required: true, type: 'secret' },
     {
-      key: 'secretToken',
-      label: 'Webhook Secret Token',
-      description: 'Optional secret token for webhook verification',
+      key: 'encryptKey',
+      label: 'Encrypt Key',
+      description: 'AES decrypt key for encrypted events (optional)',
       required: false,
       type: 'secret',
     },
     {
-      key: 'webhookProxyUrl',
-      label: 'Webhook Proxy URL',
-      description: 'HTTPS proxy URL for local development (e.g. Cloudflare tunnel)',
+      key: 'verificationToken',
+      label: 'Verification Token',
+      description: 'Token for webhook event validation (optional)',
       required: false,
-      type: 'string',
+      type: 'secret',
     },
   ],
   settings: settingsSchema,
 
-  adapterFactory: new TelegramAdapterFactory(),
+  adapterFactory: new FeishuAdapterFactory(),
 };

@@ -99,6 +99,8 @@ export interface PlatformClient {
 
   // --- Runtime Operations ---
 
+  readonly id: string;
+
   /**
    * Called after the client is registered in BotMessageRouter.
    * Discord: indexes client by token for gateway forwarding.
@@ -107,8 +109,6 @@ export interface PlatformClient {
 
   /** Parse a composite message ID into the platform-native format. */
   parseMessageId: (compositeId: string) => string | number;
-
-  readonly platform: string;
 
   /** Strip platform-specific bot mention artifacts from user input. */
   sanitizeUserInput?: (text: string) => string;
@@ -133,7 +133,6 @@ export interface PlatformClient {
  */
 export interface BotProviderConfig {
   applicationId: string;
-  connectionMode: string;
   credentials: Record<string, string>;
   platform: string;
   settings: Record<string, unknown>;
@@ -154,35 +153,59 @@ export interface BotPlatformRuntimeContext {
   registerByToken?: (token: string) => void;
 }
 
-// --------------- Client Factory ---------------
+// --------------- Adapter Factory ---------------
 
-export type PlatformClientFactory = (
-  account: BotProviderConfig,
-  context: BotPlatformRuntimeContext,
-) => PlatformClient;
+export interface ValidationResult {
+  errors?: Array<{ field: string; message: string }>;
+  valid: boolean;
+}
+
+/**
+ * Factory for creating PlatformClient instances with credential validation.
+ *
+ * Each platform implements this as a class (e.g. `new FeishuAdapterFactory()`).
+ * Wraps chat-sdk adapter creation with validation and lifecycle management.
+ */
+export interface AdapterFactory {
+  /** Create a PlatformClient instance for this platform. */
+  createClient: (config: BotProviderConfig, context: BotPlatformRuntimeContext) => PlatformClient;
+
+  /** Validate credentials before bot creation (e.g. verify token with platform API). */
+  validateCredentials?: (
+    credentials: Record<string, string>,
+    settings?: Record<string, unknown>,
+  ) => Promise<ValidationResult>;
+}
+
+// --------------- Platform Documentation ---------------
+
+export interface PlatformDocumentation {
+  /** URL to the platform's developer portal / open platform console */
+  portalUrl?: string;
+  /** URL to the usage documentation (e.g. LobeHub docs for this platform) */
+  setupGuideUrl?: string;
+}
 
 // --------------- Platform Definition ---------------
 
 /**
- * A platform definition, uniquely identified by `platform + connectionMode`.
+ * A platform definition, uniquely identified by `platform`.
  *
  * Contains metadata + factory. All runtime operations go through PlatformClient.
  */
 export interface PlatformDefinition {
-  // --- Identity ---
-  connectionMode: 'webhook' | 'websocket';
   // --- Factory ---
-  createClient: PlatformClientFactory;
+  adapterFactory: AdapterFactory;
   // --- Schemas (for frontend UI) ---
   credentials: CredentialField[];
 
   description?: string;
-  displayName: string;
+  /** Documentation links for the platform */
+  documentation?: PlatformDocumentation;
 
-  platform: string;
+  id: string;
 
-  /** URL to the platform's developer portal / open platform console */
-  portalUrl?: string;
+  name: string;
   // --- Webhook routing (optional) ---
   resolveWebhook?: PlatformWebhookResolver;
 

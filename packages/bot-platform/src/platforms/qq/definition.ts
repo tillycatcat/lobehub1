@@ -1,5 +1,5 @@
 import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
-import { qqClientFactory } from './client';
+import { QQAdapterFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {
   properties: {
@@ -34,12 +34,14 @@ const settingsSchema: PlatformSettingsSchema = {
   type: 'object',
 };
 
-export const qqWebhook: PlatformDefinition = {
-  platform: 'qq',
-  connectionMode: 'webhook',
-  description: 'Connect a QQ bot via webhook',
-  displayName: 'QQ',
-  portalUrl: 'https://q.qq.com/',
+export const qq: PlatformDefinition = {
+  id: 'qq',
+  description: 'Connect a QQ bot',
+  name: 'QQ',
+  documentation: {
+    portalUrl: 'https://q.qq.com/',
+    setupGuideUrl: 'https://lobehub.com/docs/usage/channels/qq',
+  },
 
   credentials: [
     { key: 'appId', label: 'App ID', required: true, type: 'string' },
@@ -47,5 +49,5 @@ export const qqWebhook: PlatformDefinition = {
   ],
   settings: settingsSchema,
 
-  createClient: qqClientFactory,
+  adapterFactory: new QQAdapterFactory(),
 };

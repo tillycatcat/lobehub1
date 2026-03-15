@@ -2,11 +2,12 @@ import { createQQAdapter, QQApiClient } from '@lobechat/chat-adapter-qq';
 import debug from 'debug';
 
 import type {
+  AdapterFactory,
   BotPlatformRuntimeContext,
   BotProviderConfig,
   PlatformClient,
-  PlatformClientFactory,
   PlatformMessenger,
+  ValidationResult,
 } from '../../types';
 
 const log = debug('bot-platform:qq:bot');
@@ -49,7 +50,7 @@ async function sendQQMessage(
 }
 
 class QQWebhookClient implements PlatformClient {
-  readonly platform = 'qq';
+  readonly id = 'qq';
   readonly applicationId: string;
 
   private config: BotProviderConfig;
@@ -111,9 +112,29 @@ class QQWebhookClient implements PlatformClient {
   }
 }
 
-export const qqClientFactory: PlatformClientFactory = (
-  account: BotProviderConfig,
-  context: BotPlatformRuntimeContext,
-): PlatformClient => {
-  return new QQWebhookClient(account, context);
-};
+export class QQAdapterFactory implements AdapterFactory {
+  createClient(config: BotProviderConfig, context: BotPlatformRuntimeContext): PlatformClient {
+    return new QQWebhookClient(config, context);
+  }
+
+  async validateCredentials(credentials: Record<string, string>): Promise<ValidationResult> {
+    const errors: Array<{ field: string; message: string }> = [];
+
+    if (!credentials.appId) errors.push({ field: 'appId', message: 'App ID is required' });
+    if (!credentials.appSecret)
+      errors.push({ field: 'appSecret', message: 'App Secret is required' });
+
+    if (errors.length > 0) return { errors, valid: false };
+
+    try {
+      const api = new QQApiClient(credentials.appId, credentials.appSecret);
+      await api.getAccessToken();
+      return { valid: true };
+    } catch {
+      return {
+        errors: [{ field: 'credentials', message: 'Failed to authenticate with QQ API' }],
+        valid: false,
+      };
+    }
+  }
+}

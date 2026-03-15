@@ -1,13 +1,14 @@
 // --------------- Core types ---------------
-export { buildRuntimeKey, entryKey, parseRuntimeKey } from './registry';
+export { buildRuntimeKey, parseRuntimeKey, PlatformRegistry } from './registry';
 export type {
+  AdapterFactory,
   BotPlatformRedisClient,
   BotPlatformRuntimeContext,
   BotProviderConfig,
   CredentialField,
   PlatformClient,
-  PlatformClientFactory,
   PlatformDefinition,
+  PlatformDocumentation,
   PlatformMessenger,
   PlatformSettingsSchema,
   PlatformSettingsSchemaProperty,
@@ -15,13 +16,14 @@ export type {
   PlatformWebhookResolverContext,
   RegisteredBotProviderConfig,
   UsageStats,
+  ValidationResult,
 } from './types';
 
 // --------------- Utils ---------------
 export { formatDuration, formatTokens, formatUsageStats } from './utils';
 
 // --------------- Platform definitions ---------------
-export { discordWebsocket } from './platforms/discord/definition';
-export { feishuWebhook, larkWebhook } from './platforms/lark/definition';
-export { qqWebhook } from './platforms/qq/definition';
-export { telegramWebhook } from './platforms/telegram/definition';
+export { discord } from './platforms/discord/definition';
+export { feishu } from './platforms/feishu/definition';
+export { qq } from './platforms/qq/definition';
+export { telegram } from './platforms/telegram/definition';

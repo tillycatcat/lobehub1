@@ -219,7 +219,7 @@
     "@lobechat/builtin-tools": "workspace:*",
     "@lobechat/business-config": "workspace:*",
     "@lobechat/business-const": "workspace:*",
-    "@lobechat/chat-adapter-lark": "workspace:*",
+    "@lobechat/chat-adapter-feishu": "workspace:*",
     "@lobechat/chat-adapter-qq": "workspace:*",
     "@lobechat/config": "workspace:*",
     "@lobechat/const": "workspace:*",

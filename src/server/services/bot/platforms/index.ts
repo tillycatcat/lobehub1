@@ -1,33 +1,13 @@
-import {
-  discordWebsocket,
-  feishuWebhook,
-  larkWebhook,
-  type PlatformDefinition,
-  qqWebhook,
-  telegramWebhook,
-} from '@lobechat/bot-platform';
+import { discord, feishu, PlatformRegistry, qq, telegram } from '@lobechat/bot-platform';
 
-const allDefinitions: PlatformDefinition[] = [
-  discordWebsocket,
-  telegramWebhook,
-  larkWebhook,
-  feishuWebhook,
-  qqWebhook,
-];
+export const platformRegistry = new PlatformRegistry();
 
-/** Look up platform definition by platform name. */
-const definitionByPlatform = new Map<string, PlatformDefinition>(
-  allDefinitions.map((d) => [d.platform, d]),
-);
+platformRegistry.register(discord);
+platformRegistry.register(telegram);
+platformRegistry.register(feishu);
+platformRegistry.register(qq);
 
-export function getDefinition(platform: string): PlatformDefinition | undefined {
-  return definitionByPlatform.get(platform);
-}
-
-export function getAllDefinitions(): PlatformDefinition[] {
-  return allDefinitions;
-}
-
-export function getAllPlatforms(): string[] {
-  return allDefinitions.map((d) => d.platform);
-}
+// Re-export convenience accessors for existing consumers
+export const getDefinition = platformRegistry.getPlatform.bind(platformRegistry);
+export const getAllDefinitions = platformRegistry.listPlatforms.bind(platformRegistry);
+export const getAllPlatforms = platformRegistry.listPlatformIds.bind(platformRegistry);

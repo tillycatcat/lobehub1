@@ -115,13 +115,12 @@ export class BotCallbackService {
 
     const config: BotProviderConfig = {
       applicationId,
-      connectionMode: entry.connectionMode,
       credentials,
       platform,
       settings: settings || {},
     };
 
-    const connector = entry.createClient(config, {});
+    const connector = entry.adapterFactory.createClient(config, {});
     const messenger = connector.getMessenger(platformThreadId);
 
     return { charLimit, messenger, connector };

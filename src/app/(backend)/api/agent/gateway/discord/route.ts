@@ -1,4 +1,4 @@
-import { type BotProviderConfig, discordWebsocket } from '@lobechat/bot-platform';
+import { type BotProviderConfig, discord } from '@lobechat/bot-platform';
 import debug from 'debug';
 import type { NextRequest } from 'next/server';
 import { after } from 'next/server';
@@ -18,12 +18,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function createDiscordBot(applicationId: string, credentials: Record<string, string>) {
   const config: BotProviderConfig = {
     applicationId,
-    connectionMode: 'websocket',
     credentials,
     platform: 'discord',
     settings: {},
   };
-  return discordWebsocket.createClient(config, {});
+  return discord.adapterFactory.createClient(config, {});
 }
 
 async function processConnectQueue(remainingMs: number): Promise<number> {

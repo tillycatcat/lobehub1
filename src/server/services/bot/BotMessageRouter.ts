@@ -257,7 +257,6 @@ export class BotMessageRouter {
           // Create PlatformClient instance
           const providerConfig: BotProviderConfig = {
             applicationId,
-            connectionMode: entry.connectionMode,
             credentials,
             platform,
             settings: (provider.settings as Record<string, unknown>) || {},
@@ -268,7 +267,7 @@ export class BotMessageRouter {
             redisClient: getAgentRuntimeRedisClient() as any,
           };
 
-          const connector = entry.createClient(providerConfig, runtimeContext);
+          const connector = entry.adapterFactory.createClient(providerConfig, runtimeContext);
 
           // Create Chat SDK adapters from the bot instance
           const adapters = connector.createAdapter();

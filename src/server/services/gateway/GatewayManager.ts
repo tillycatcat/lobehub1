@@ -20,7 +20,7 @@ export class GatewayManager {
 
   constructor(config: GatewayManagerConfig) {
     this.config = config;
-    this.definitionByPlatform = new Map(config.definitions.map((e) => [e.platform, e]));
+    this.definitionByPlatform = new Map(config.definitions.map((e) => [e.id, e]));
   }
 
   get isRunning(): boolean {
@@ -191,22 +191,12 @@ export class GatewayManager {
 
     const config: BotProviderConfig = {
       applicationId: provider.applicationId,
-      connectionMode: def.connectionMode,
       credentials: provider.credentials,
       platform,
       settings: {},
     };
 
-    return def.createClient(config, {});
-  }
-
-  /**
-   * Check whether a platform uses a persistent connection (e.g. WebSocket).
-   * Persistent bots cannot run in serverless environments.
-   */
-  isPersistent(platform: string): boolean {
-    const def = this.definitionByPlatform.get(platform);
-    return def?.connectionMode === 'websocket';
+    return def.adapterFactory.createClient(config, {});
   }
 }
 

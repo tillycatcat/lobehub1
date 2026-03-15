@@ -1,5 +1,5 @@
 {
-  "name": "@lobechat/chat-adapter-lark",
+  "name": "@lobechat/chat-adapter-feishu",
   "version": "0.1.0",
   "description": "Lark/Feishu adapter for chat SDK",
   "type": "module",

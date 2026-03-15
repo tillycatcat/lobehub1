@@ -37,7 +37,7 @@ const mockCreateBot = vi.hoisted(() =>
     extractChatId: (id: string) => id,
     getMessenger: mockGetMessenger,
     parseMessageId: (id: string) => id,
-    platform: 'mock',
+    id: 'mock',
     start: vi.fn(),
     stop: vi.fn(),
   })),
@@ -74,11 +74,10 @@ vi.mock('../platforms', () => ({
   getDefinition: vi.fn().mockImplementation((platform: string) => {
     if (platform === 'unknown') return undefined;
     return {
-      connectionMode: platform === 'discord' ? 'websocket' : 'webhook',
-      createClient: mockCreateBot,
+      adapterFactory: { createClient: mockCreateBot },
       credentials: [],
-      displayName: platform,
-      platform,
+      name: platform,
+      id: platform,
     };
   }),
 }));
