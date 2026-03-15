@@ -34,8 +34,8 @@ describe('PlatformRegistry', () => {
     });
   });
 
-  describe('listPlatforms / listPlatformIds', () => {
-    it('should list all registered definitions and IDs', () => {
+  describe('listPlatforms', () => {
+    it('should list all registered definitions', () => {
       const registry = new PlatformRegistry();
       const a = fakeDef('a');
       const b = fakeDef('b');
@@ -43,7 +43,6 @@ describe('PlatformRegistry', () => {
       registry.register(a).register(b);
 
       expect(registry.listPlatforms()).toEqual([a, b]);
-      expect(registry.listPlatformIds()).toEqual(['a', 'b']);
     });
   });
 

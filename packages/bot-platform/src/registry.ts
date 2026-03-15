@@ -34,11 +34,6 @@ export class PlatformRegistry {
     return [...this.platforms.values()];
   }
 
-  /** List all registered platform IDs. */
-  listPlatformIds(): string[] {
-    return [...this.platforms.keys()];
-  }
-
   /** Check whether a platform is registered. */
   has(platform: string): boolean {
     return this.platforms.has(platform);

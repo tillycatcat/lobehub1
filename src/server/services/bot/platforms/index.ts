@@ -10,4 +10,3 @@ platformRegistry.register(qq);
 // Re-export convenience accessors for existing consumers
 export const getDefinition = platformRegistry.getPlatform.bind(platformRegistry);
 export const getAllDefinitions = platformRegistry.listPlatforms.bind(platformRegistry);
-export const getAllPlatforms = platformRegistry.listPlatformIds.bind(platformRegistry);
