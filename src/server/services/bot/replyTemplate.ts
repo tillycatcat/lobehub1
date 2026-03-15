@@ -1,7 +1,6 @@
-import { formatDuration } from '@lobechat/bot-platform';
-
 import type { StepPresentationData } from '../agentRuntime/types';
 import { getExtremeAck } from './ackPhrases';
+import { formatDuration } from './platforms';
 
 // Use raw Unicode emoji instead of Chat SDK emoji placeholders,
 // because bot-callback webhooks send via DiscordPlatformClient directly
@@ -107,8 +106,7 @@ function formatCompletedTools(
     .join('\n');
 }
 
-// Re-export from bot-platform for backward compat (used by tests)
-export { formatDuration, formatTokens } from '@lobechat/bot-platform';
+export { formatDuration, formatTokens } from './platforms';
 
 function renderProgressHeader(params: { elapsedMs?: number; totalToolCalls?: number }): string {
   const { elapsedMs, totalToolCalls } = params;

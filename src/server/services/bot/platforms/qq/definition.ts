@@ -1,4 +1,4 @@
-import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
+import type { PlatformDefinition, PlatformSettingsSchema } from '../types';
 import { QQAdapterFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {

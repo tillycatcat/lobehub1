@@ -1,4 +1,3 @@
-import type { PlatformClient } from '@lobechat/bot-platform';
 import type { ChatTopicBotContext } from '@lobechat/types';
 import type { Message, SentMessage, Thread } from 'chat';
 import { emoji } from 'chat';
@@ -14,6 +13,7 @@ import { isQueueAgentRuntimeEnabled } from '@/server/services/queue/impls';
 import { SystemAgentService } from '@/server/services/systemAgent';
 
 import { formatPrompt as formatPromptUtil } from './formatPrompt';
+import type { PlatformClient } from './platforms';
 import {
   renderError,
   renderFinalReply,

@@ -8,7 +8,7 @@ import type {
   PlatformClient,
   PlatformMessenger,
   ValidationResult,
-} from '../../types';
+} from '../types';
 import { TELEGRAM_API_BASE, TelegramApi } from './api';
 import { extractBotId, setTelegramWebhook } from './helpers';
 

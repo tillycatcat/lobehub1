@@ -10,8 +10,8 @@ import type {
   PlatformMessenger,
   UsageStats,
   ValidationResult,
-} from '../../types';
-import { formatUsageStats } from '../../utils';
+} from '../types';
+import { formatUsageStats } from '../utils';
 import { DiscordApi } from './api';
 
 const log = debug('bot-platform:discord:bot');

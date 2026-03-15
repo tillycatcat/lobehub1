@@ -1,14 +1,14 @@
-import {
-  type BotProviderConfig,
-  buildRuntimeKey,
-  type PlatformClient,
-  type PlatformDefinition,
-} from '@lobechat/bot-platform';
 import debug from 'debug';
 
 import { getServerDB } from '@/database/core/db-adaptor';
 import { AgentBotProviderModel } from '@/database/models/agentBotProvider';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
+import {
+  type BotProviderConfig,
+  buildRuntimeKey,
+  type PlatformClient,
+  type PlatformDefinition,
+} from '@/server/services/bot/platforms';
 
 const log = debug('lobe-server:bot-gateway');
 

@@ -1,4 +1,4 @@
-import type { PlatformDefinition, PlatformSettingsSchema } from '../../types';
+import type { PlatformDefinition, PlatformSettingsSchema } from '../types';
 import { TelegramAdapterFactory } from './client';
 
 const settingsSchema: PlatformSettingsSchema = {

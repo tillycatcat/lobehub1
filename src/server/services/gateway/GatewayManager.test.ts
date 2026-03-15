@@ -1,10 +1,10 @@
 // @vitest-environment node
-import type { PlatformClient, PlatformDefinition } from '@lobechat/bot-platform';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getServerDB } from '@/database/core/db-adaptor';
 import { AgentBotProviderModel } from '@/database/models/agentBotProvider';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
+import type { PlatformClient, PlatformDefinition } from '@/server/services/bot/platforms';
 
 import { createGatewayManager, GatewayManager, getGatewayManager } from './GatewayManager';
 

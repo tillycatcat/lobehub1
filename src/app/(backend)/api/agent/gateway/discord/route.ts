@@ -1,4 +1,3 @@
-import { type BotProviderConfig, discord } from '@lobechat/bot-platform';
 import debug from 'debug';
 import type { NextRequest } from 'next/server';
 import { after } from 'next/server';
@@ -6,6 +5,7 @@ import { after } from 'next/server';
 import { getServerDB } from '@/database/core/db-adaptor';
 import { AgentBotProviderModel } from '@/database/models/agentBotProvider';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
+import { type BotProviderConfig, discord } from '@/server/services/bot/platforms';
 import { BotConnectQueue } from '@/server/services/gateway/botConnectQueue';
 
 const log = debug('lobe-server:bot:gateway:cron:discord');

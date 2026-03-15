@@ -63,6 +63,7 @@ const mockCreateAdapter = vi.hoisted(() =>
 );
 
 vi.mock('../platforms', () => ({
+  buildRuntimeKey: (platform: string, appId: string) => `${platform}:${appId}`,
   getDefinition: vi.fn().mockImplementation((platform: string) => {
     if (platform === 'unknown') return undefined;
     return {

@@ -1,11 +1,4 @@
 import { createIoRedisState } from '@chat-adapter/state-ioredis';
-import {
-  type BotPlatformRuntimeContext,
-  type BotProviderConfig,
-  buildRuntimeKey,
-  type PlatformClient,
-  type PlatformDefinition,
-} from '@lobechat/bot-platform';
 import { Chat, ConsoleLogger } from 'chat';
 import debug from 'debug';
 
@@ -17,6 +10,13 @@ import { getAgentRuntimeRedisClient } from '@/server/modules/AgentRuntime/redis'
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 
 import { AgentBridgeService } from './AgentBridgeService';
+import {
+  type BotPlatformRuntimeContext,
+  type BotProviderConfig,
+  buildRuntimeKey,
+  type PlatformClient,
+  type PlatformDefinition,
+} from './platforms';
 import { getDefinition } from './platforms';
 
 const log = debug('lobe-server:bot:message-router');

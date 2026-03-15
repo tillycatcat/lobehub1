@@ -1,9 +1,3 @@
-import type {
-  BotProviderConfig,
-  PlatformClient,
-  PlatformMessenger,
-  UsageStats,
-} from '@lobechat/bot-platform';
 import debug from 'debug';
 
 import { AgentBotProviderModel } from '@/database/models/agentBotProvider';
@@ -12,6 +6,7 @@ import { type LobeChatDatabase } from '@/database/type';
 import { KeyVaultsGateKeeper } from '@/server/modules/KeyVaultsEncrypt';
 import { SystemAgentService } from '@/server/services/systemAgent';
 
+import type { BotProviderConfig, PlatformClient, PlatformMessenger, UsageStats } from './platforms';
 import { getDefinition } from './platforms';
 import { renderError, renderFinalReply, renderStepProgress, splitMessage } from './replyTemplate';
 

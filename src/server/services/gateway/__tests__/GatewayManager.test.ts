@@ -1,5 +1,6 @@
-import type { PlatformDefinition } from '@lobechat/bot-platform';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { PlatformDefinition } from '@/server/services/bot/platforms';
 
 import { GatewayManager } from '../GatewayManager';
 
