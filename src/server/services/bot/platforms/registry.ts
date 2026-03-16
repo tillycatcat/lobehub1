@@ -3,6 +3,7 @@ import type {
   BotProviderConfig,
   PlatformClient,
   PlatformDefinition,
+  SerializedPlatformDefinition,
   ValidationResult,
 } from './types';
 
@@ -32,6 +33,11 @@ export class PlatformRegistry {
   /** List all registered platform definitions. */
   listPlatforms(): PlatformDefinition[] {
     return [...this.platforms.values()];
+  }
+
+  /** List platform definitions serialized for frontend consumption. */
+  listSerializedPlatforms(): SerializedPlatformDefinition[] {
+    return this.listPlatforms().map(({ clientFactory, ...rest }) => rest);
   }
 
   /**

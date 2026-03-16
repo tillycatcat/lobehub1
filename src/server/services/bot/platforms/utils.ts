@@ -1,4 +1,39 @@
-import type { UsageStats } from './types';
+import type { FieldSchema, UsageStats } from './types';
+
+// --------------- Settings defaults ---------------
+
+/**
+ * Recursively extract default values from a FieldSchema.
+ */
+function extractFieldDefault(field: FieldSchema): unknown {
+  if (field.type === 'object' && field.properties) {
+    const obj: Record<string, unknown> = {};
+    for (const child of field.properties) {
+      const value = extractFieldDefault(child);
+      if (value !== undefined) obj[child.key] = value;
+    }
+    return Object.keys(obj).length > 0 ? obj : undefined;
+  }
+  return field.default;
+}
+
+/**
+ * Extract defaults from a FieldSchema array.
+ *
+ * Recursively walks the fields and collects all `default` values.
+ * Use this to merge with user-provided settings at runtime:
+ *
+ *   const settings = { ...extractDefaults(definition.settings), ...provider.settings };
+ */
+export function extractDefaults(fields?: FieldSchema[]): Record<string, unknown> {
+  if (!fields) return {};
+  const result: Record<string, unknown> = {};
+  for (const field of fields) {
+    const value = extractFieldDefault(field);
+    if (value !== undefined) result[field.key] = value;
+  }
+  return result;
+}
 
 // --------------- Runtime key helpers ---------------
 

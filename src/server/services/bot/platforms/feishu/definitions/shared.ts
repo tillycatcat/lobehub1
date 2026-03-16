@@ -1,10 +1,29 @@
-import type { FieldSchema, PlatformDefinition } from '../types';
-import { QQClientFactory } from './client';
+import type { FieldSchema } from '../../types';
+import { FeishuClientFactory } from '../client';
 
-const settings: FieldSchema[] = [
+export const sharedCredentials: FieldSchema[] = [
+  { key: 'appId', label: 'App ID', required: true, type: 'string' },
+  { key: 'appSecret', label: 'App Secret', required: true, type: 'password' },
+  {
+    key: 'encryptKey',
+    description: 'AES decrypt key for encrypted events (optional)',
+    label: 'Encrypt Key',
+    required: false,
+    type: 'password',
+  },
+  {
+    key: 'verificationToken',
+    description: 'Token for webhook event validation (optional)',
+    label: 'Verification Token',
+    required: false,
+    type: 'password',
+  },
+];
+
+export const sharedSettings: FieldSchema[] = [
   {
     key: 'charLimit',
-    default: 2000,
+    default: 4000,
     group: 'general',
     label: 'Character Limit',
     minimum: 100,
@@ -39,19 +58,4 @@ const settings: FieldSchema[] = [
   },
 ];
 
-export const qq: PlatformDefinition = {
-  id: 'qq',
-  name: 'QQ',
-  description: 'Connect a QQ bot',
-  documentation: {
-    portalUrl: 'https://q.qq.com/',
-    setupGuideUrl: 'https://lobehub.com/docs/usage/channels/qq',
-  },
-  credentials: [
-    { key: 'appId', label: 'App ID', required: true, type: 'string' },
-    { key: 'appSecret', label: 'App Secret', required: true, type: 'password' },
-  ],
-  settings,
-
-  clientFactory: new QQClientFactory(),
-};
+export const sharedClientFactory = new FeishuClientFactory();

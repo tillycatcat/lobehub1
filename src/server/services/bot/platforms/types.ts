@@ -2,46 +2,51 @@
 // Bot Platform Core Types
 // ============================================================================
 
-// --------------- Credential Schema ---------------
-
-export interface CredentialField {
-  description?: string;
-  /** Only show this field in development environment */
-  devOnly?: boolean;
-  key: string;
-  label: string;
-  placeholder?: string;
-  required: boolean;
-  type: 'secret' | 'string';
-}
-
-// --------------- Settings Schema ---------------
+// --------------- Field Schema ---------------
 
 /**
- * Lightweight JSON Schema subset for describing platform settings.
+ * Unified field schema for both credentials and settings.
  *
- * Each platform definition declares a `settingsSchema`.
- * The schema drives:
- * - Frontend: auto-generated settings form
- * - Runtime: default value resolution (user overrides ← schema defaults)
- * - Validation: ajv or similar can validate user input against the schema
+ * Drives:
+ * - Server: validation + default value extraction
+ * - Frontend: auto-generated form (type → component mapping)
  */
-export interface PlatformSettingsSchemaProperty {
+export interface FieldSchema {
+  /** Default value (settings only) */
   default?: unknown;
   description?: string;
+  /** Only show in development environment */
+  devOnly?: boolean;
+  /** Enum options for select fields */
   enum?: string[];
+  /** Display labels for enum options */
   enumLabels?: string[];
-  items?: PlatformSettingsSchemaProperty;
+  /** Group key — fields with the same group render together */
+  group?: string;
+  /** Array item schema */
+  items?: FieldSchema;
+  /** Unique field identifier */
+  key: string;
+  /** Display label */
+  label: string;
   maximum?: number;
   minimum?: number;
-  properties?: Record<string, PlatformSettingsSchemaProperty>;
-  title?: string;
-  type: 'array' | 'boolean' | 'integer' | 'number' | 'object' | 'string';
-}
-
-export interface PlatformSettingsSchema {
-  properties: Record<string, PlatformSettingsSchemaProperty>;
-  type: 'object';
+  placeholder?: string;
+  /** Nested fields (for type: 'object') */
+  properties?: FieldSchema[];
+  required?: boolean;
+  /**
+   * Field type, maps to UI component:
+   * - 'string' → Input
+   * - 'password' → Password input
+   * - 'number' / 'integer' → NumberInput
+   * - 'boolean' → Switch
+   * - 'object' → nested group
+   * - 'array' → list
+   */
+  type: 'array' | 'boolean' | 'integer' | 'number' | 'object' | 'password' | 'string';
+  /** Conditional visibility: show only when another field matches a value */
+  visibleWhen?: { field: string; value: unknown };
 }
 
 // --------------- Platform Messenger ---------------
@@ -209,17 +214,11 @@ export abstract class ClientFactory {
  * Contains metadata, factory, and validation. All runtime operations go through PlatformClient.
  */
 export interface PlatformDefinition {
-  /** Which credential key serves as the applicationId */
-  applicationIdField: string;
-
-  /** Auto-derive applicationId from another credential field */
-  autoApplicationId?: { deriveFrom: string; strategy: 'before-colon' };
-
   /** Factory for creating PlatformClient instances and validating credentials/settings. */
   clientFactory: ClientFactory;
 
   /** The credentials required for the platform. */
-  credentials: CredentialField[];
+  credentials: FieldSchema[];
 
   /** The description of the platform. */
   description?: string;
@@ -233,11 +232,8 @@ export interface PlatformDefinition {
   /** The name of the platform. */
   name: string;
 
-  /** The settings schema required for the platform. */
-  settings?: PlatformSettingsSchema;
-
-  /** How the webhook is configured: 'auto' = set via API, 'manual' = user copies URL */
-  webhookMode: 'auto' | 'manual';
+  /** Platform settings schema, drives form generation + default extraction. */
+  settings?: FieldSchema[];
 }
 
 /** Serialized platform definition for frontend consumption (excludes runtime-only fields). */
