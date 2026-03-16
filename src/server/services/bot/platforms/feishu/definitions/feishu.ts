@@ -11,6 +11,5 @@ export const feishu: PlatformDefinition = {
   },
   credentials: sharedCredentials,
   settings: sharedSettings,
-
   clientFactory: sharedClientFactory,
 };

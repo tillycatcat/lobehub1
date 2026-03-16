@@ -8,6 +8,7 @@ import { memo, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { FormInput, FormPassword } from '@/components/FormInput';
+import InfoTooltip from '@/components/InfoTooltip';
 import { useAppOrigin } from '@/hooks/useAppOrigin';
 import type {
   FieldSchema,
@@ -207,6 +208,16 @@ const Body = memo<BodyProps>(
       <Flexbox horizontal align="center" gap={8}>
         {ColorIcon && <ColorIcon size={32} />}
         {platformName}
+        {platformDef.documentation?.setupGuideUrl && (
+          <a
+            href={platformDef.documentation.setupGuideUrl}
+            rel="noopener noreferrer"
+            target="_blank"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <InfoTooltip title={t('channel.setupGuide')} />
+          </a>
+        )}
       </Flexbox>
     );
 

@@ -19,12 +19,19 @@ const ICON_NAMES = [
   'WhatsApp',
 ] as const;
 
+/** Alias map for platforms whose display name differs from the icon name. */
+const ICON_ALIASES: Record<string, string> = {
+  feishu: 'Lark',
+};
+
 /**
  * Resolve icon component by matching against known icon names.
  * Accepts either a platform display name (e.g. "Feishu / Lark") or id (e.g. "discord").
  */
 export function getPlatformIcon(nameOrId: string): FC<any> | undefined {
-  // Match by substring in display name (e.g. "Feishu / Lark" → "Lark")
+  const alias = ICON_ALIASES[nameOrId.toLowerCase()];
+  if (alias) return (Icons as Record<string, any>)[alias];
+
   const name = ICON_NAMES.find(
     (n) => nameOrId.includes(n) || nameOrId.toLowerCase() === n.toLowerCase(),
   );

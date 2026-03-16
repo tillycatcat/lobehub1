@@ -11,6 +11,5 @@ export const lark: PlatformDefinition = {
   },
   credentials: sharedCredentials,
   settings: sharedSettings,
-
   clientFactory: sharedClientFactory,
 };
