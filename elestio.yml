@@ -1,6 +1,6 @@
 config:
   runTime: "dockerCompose"
-  buildDir: "/docker"
+  buildDir: "/docker-compose/deploy"  # Points to your path
   buildCommand: "docker compose build"
   runCommand: "docker compose up -d"
 
@@ -8,6 +8,7 @@ ports:
   - protocol: "HTTPS"
     targetPort: 3010
     public: true
+
 
 environments:
   - key: "NEXT_PUBLIC_APP_URL"
