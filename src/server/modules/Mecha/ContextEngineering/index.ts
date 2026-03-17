@@ -149,6 +149,7 @@ export const serverMessagesEngine = async ({
   });
 
   const result = await engine.process();
+  console.log('Final processed messages:', result.messages);
   return result.messages;
 };
 
