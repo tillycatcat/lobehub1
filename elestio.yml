@@ -1,0 +1,18 @@
+config:
+  runTime: "dockerCompose"
+  buildDir: "/docker"
+  buildCommand: "docker compose build"
+  runCommand: "docker compose up -d"
+
+ports:
+  - protocol: "HTTPS"
+    targetPort: 3010
+    public: true
+
+environments:
+  - key: "NEXT_PUBLIC_APP_URL"
+    value: "${domain}"
+  - key: "NEXT_PUBLIC_DISABLE_AUTH"
+    value: "false"
+  - key: "ACCESS_CODE"
+    value: "changeme"  # Optional global password
