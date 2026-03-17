@@ -1,7 +1,12 @@
 export interface SpotlightBroadcastEvents {
   /**
    * Ask spotlight renderer to focus the input box.
-   * Triggered from the main process after showing the spotlight window.
    */
   spotlightFocus: () => void;
+
+  /**
+   * Cross-window data sync notification.
+   * Receiving windows should revalidate the specified SWR cache keys.
+   */
+  syncData: (data: { keys: string[]; source: string }) => void;
 }

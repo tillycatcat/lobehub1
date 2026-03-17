@@ -1,57 +1,67 @@
-import { ipcMain, screen } from 'electron';
+import { ipcMain, Menu, screen } from 'electron';
 
 import { BrowsersIdentifiers } from '@/appBrowsers';
 
 import { ControllerModule, IpcMethod, shortcut } from './index';
+
+interface ModelMenuItem {
+  group?: string;
+  label: string;
+  provider: string;
+  value: string;
+}
 
 export default class SpotlightCtr extends ControllerModule {
   static override readonly groupName = 'spotlight';
 
   private blurAttached = false;
   private crashRecoveryAttached = false;
+  private menuOpen = false;
+  private chatState = false;
 
   afterAppReady() {
-    // Listen for renderer ready signal (invoke → handle)
     ipcMain.handle('spotlight:ready', () => {
       const spotlight = this.app.browserManager.browsers.get(BrowsersIdentifiers.spotlight);
       spotlight?.markReady();
     });
 
-    // Listen for renderer hide request
     ipcMain.handle('spotlight:hide', () => {
-      const spotlight = this.app.browserManager.browsers.get(BrowsersIdentifiers.spotlight);
-      spotlight?.hide();
+      this.hideSpotlight();
     });
 
-    // Listen for renderer resize request
     ipcMain.handle('spotlight:resize', (_event, params: { height: number; width: number }) => {
       const spotlight = this.app.browserManager.browsers.get(BrowsersIdentifiers.spotlight);
       if (!spotlight) return;
 
       const currentBounds = spotlight.browserWindow.getBounds();
-      spotlight.browserWindow.setBounds(
-        {
-          height: params.height,
-          width: params.width,
-          x: currentBounds.x,
-          y: currentBounds.y,
-        },
-        true,
-      );
+      const newBounds = {
+        height: params.height,
+        width: params.width,
+        x: currentBounds.x,
+        y: currentBounds.y,
+      };
+
+      if (spotlight.expandDirection === 'up' && params.height > currentBounds.height) {
+        newBounds.y = currentBounds.y - (params.height - currentBounds.height);
+      }
+
+      spotlight.browserWindow.setBounds(newBounds, true);
+    });
+
+    ipcMain.handle('spotlight:setChatState', (_event, isChatting: boolean) => {
+      this.chatState = isChatting;
     });
   }
 
   @shortcut('showSpotlight')
   async toggleSpotlight() {
-    // Use retrieveByIdentifier to auto-create if not yet initialized (e.g. after onboarding)
     const spotlight = this.app.browserManager.retrieveByIdentifier(BrowsersIdentifiers.spotlight);
 
-    // Lazy-attach blur and crash recovery on first access
     this.ensureBlurHandler(spotlight);
     this.ensureCrashRecovery(spotlight);
 
     if (spotlight.browserWindow.isVisible()) {
-      spotlight.hide();
+      this.hideSpotlight();
       return;
     }
 
@@ -59,8 +69,45 @@ export default class SpotlightCtr extends ControllerModule {
 
     const cursor = screen.getCursorScreenPoint();
     spotlight.showAt(cursor);
-
     spotlight.broadcast('spotlightFocus');
+  }
+
+  @IpcMethod()
+  async openModelMenu(items: ModelMenuItem[]) {
+    const spotlight = this.app.browserManager.browsers.get(BrowsersIdentifiers.spotlight);
+    if (!spotlight) return null;
+
+    this.menuOpen = true;
+
+    return new Promise<{ model: string; provider: string } | null>((resolve) => {
+      const menuItems: Electron.MenuItemConstructorOptions[] = [];
+      let currentGroup: string | undefined;
+
+      for (const item of items) {
+        if (item.group && item.group !== currentGroup) {
+          if (currentGroup !== undefined) {
+            menuItems.push({ type: 'separator' });
+          }
+          menuItems.push({ enabled: false, label: item.group });
+          currentGroup = item.group;
+        }
+
+        menuItems.push({
+          click: () => resolve({ model: item.value, provider: item.provider }),
+          label: item.label,
+        });
+      }
+
+      const menu = Menu.buildFromTemplate(menuItems);
+
+      menu.popup({
+        callback: () => {
+          this.menuOpen = false;
+          resolve(null);
+        },
+        window: spotlight.browserWindow,
+      });
+    });
   }
 
   @IpcMethod()
@@ -69,21 +116,43 @@ export default class SpotlightCtr extends ControllerModule {
     if (!spotlight) return;
 
     const currentBounds = spotlight.browserWindow.getBounds();
-    spotlight.browserWindow.setBounds(
-      {
-        height: params.height,
-        width: params.width,
-        x: currentBounds.x,
-        y: currentBounds.y,
-      },
-      true,
-    );
+    const newBounds = {
+      height: params.height,
+      width: params.width,
+      x: currentBounds.x,
+      y: currentBounds.y,
+    };
+
+    if (spotlight.expandDirection === 'up' && params.height > currentBounds.height) {
+      newBounds.y = currentBounds.y - (params.height - currentBounds.height);
+    }
+
+    spotlight.browserWindow.setBounds(newBounds, true);
   }
 
   @IpcMethod()
   async hide() {
+    this.hideSpotlight();
+  }
+
+  @IpcMethod()
+  async expandToMain(params: { agentId: string; groupId?: string; topicId: string }) {
+    const mainWindow = this.app.browserManager.getMainWindow();
+    const path = params.groupId
+      ? `/group/${params.groupId}?topic=${params.topicId}`
+      : `/agent/${params.agentId}?topic=${params.topicId}`;
+
+    mainWindow.show();
+    mainWindow.broadcast('navigate', { path });
+    this.hideSpotlight();
+  }
+
+  private hideSpotlight() {
     const spotlight = this.app.browserManager.browsers.get(BrowsersIdentifiers.spotlight);
-    spotlight?.hide();
+    if (spotlight) {
+      spotlight.hide();
+      this.chatState = false;
+    }
   }
 
   private ensureBlurHandler(
@@ -93,6 +162,7 @@ export default class SpotlightCtr extends ControllerModule {
     this.blurAttached = true;
 
     spotlight.browserWindow.on('blur', () => {
+      if (this.menuOpen || this.chatState) return;
       if (spotlight.browserWindow.isVisible()) {
         spotlight.hide();
       }
@@ -108,8 +178,6 @@ export default class SpotlightCtr extends ControllerModule {
     spotlight.browserWindow.webContents.on('render-process-gone', () => {
       console.error('[SpotlightCtr] Spotlight renderer crashed, reloading...');
       spotlight.resetReady();
-      // Reload instead of destroy+recreate — Browser.destroy() doesn't truly
-      // destroy the BrowserWindow or remove it from BrowserManager's map.
       spotlight.loadUrl(spotlight.options.path).catch((e) => {
         console.error('[SpotlightCtr] Failed to reload after crash:', e);
       });
