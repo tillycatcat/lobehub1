@@ -64,7 +64,10 @@ const ModelChip = memo(() => {
       })),
     );
 
-    const result = await window.electronAPI?.invoke?.('spotlight.openModelMenu', items);
+    const result = await window.electronAPI?.invoke?.<{ model: string; provider: string } | null>(
+      'spotlight.openModelMenu',
+      items,
+    );
     if (result) {
       setCurrentModel(result);
     }
